@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from engine import fetch_random_pokemon, calculate_damage
+import random
 
 # Extremely simplified in-memory state. In production, use Redis or MongoDB.
 active_battles = {}
@@ -26,7 +27,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p1": {"id": challenger.id, "name": challenger.first_name, "pkmn": p1_pokemon},
         "p2_tag": target_username.replace("@", ""),
         "p2": {"id": None, "name": target_username, "pkmn": p2_pokemon}, # We don't know their ID until they click
-        "turn": "p1", # Player 1 goes first
+        "choices": {"p1": None, "p2": None}, # Simultaneous turn choices
         "status": "active"
     }
 
@@ -62,13 +63,29 @@ async def send_battle_state(chat_id, battle_id, context, action_text="", message
             await context.bot.send_message(chat_id=chat_id, text=text)
         return
 
-    # Determine whose turn it is
-    current_player = p1 if battle["turn"] == "p1" else p2
-    text += f"👉 It is {current_player['name']}'s turn! Select a move:"
+    # If neither fainted, show buttons
+    choices = battle["choices"]
+    
+    # Display who is still thinking
+    thinking = []
+    if choices["p1"] is None: thinking.append(p1["name"])
+    if choices["p2"] is None: thinking.append(p2["name"])
+    
+    if len(thinking) == 2:
+        text += f"👉 Both players must select a move!"
+    elif len(thinking) == 1:
+        text += f"⌛ Waiting for {thinking[0]} to select a move..."
 
     keyboard = []
-    for i, move in enumerate(current_player['pkmn']['moves']):
-        keyboard.append([InlineKeyboardButton(f"{move['name']} ({move['power']} BP)", callback_data=f"move_{battle_id}_{i}")])
+    # P1 Moves (Red)
+    p1_row1 = [InlineKeyboardButton(f"🔴 {m['name']}", callback_data=f"move_{battle_id}_p1_{i}") for i, m in enumerate(p1['pkmn']['moves'][:2])]
+    p1_row2 = [InlineKeyboardButton(f"🔴 {m['name']}", callback_data=f"move_{battle_id}_p1_{i}") for i, m in enumerate(p1['pkmn']['moves'][2:])]
+    keyboard.extend([p1_row1, p1_row2])
+    
+    # P2 Moves (Blue)
+    p2_row1 = [InlineKeyboardButton(f"🔵 {m['name']}", callback_data=f"move_{battle_id}_p2_{i}") for i, m in enumerate(p2['pkmn']['moves'][:2])]
+    p2_row2 = [InlineKeyboardButton(f"🔵 {m['name']}", callback_data=f"move_{battle_id}_p2_{i}") for i, m in enumerate(p2['pkmn']['moves'][2:])]
+    keyboard.extend([p2_row1, p2_row2])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     if message_to_edit:
@@ -78,9 +95,10 @@ async def send_battle_state(chat_id, battle_id, context, action_text="", message
 
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    data = query.data.split("_") # move_b_1234_0
+    data = query.data.split("_") # move_b_1234_p1_0
     battle_id = f"{data[1]}_{data[2]}"
-    move_index = int(data[3])
+    player_key = data[3]
+    move_index = int(data[4])
 
     if battle_id not in active_battles:
         await query.answer("This battle is no longer active.", show_alert=True)
@@ -89,40 +107,66 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     battle = active_battles[battle_id]
     user_id = query.from_user.id
 
-    # Register Player 2 if they are clicking for the first time and match the tag
-    if battle["p2"]["id"] is None and query.from_user.username == battle["p2_tag"]:
+    # Register Player 2 if they are clicking for the first time
+    if battle["p2"]["id"] is None and player_key == "p2" and query.from_user.username == battle["p2_tag"]:
         battle["p2"]["id"] = user_id
         battle["p2"]["name"] = query.from_user.first_name
 
-    current_player_key = battle["turn"]
-    current_player = battle[current_player_key]
-    other_player_key = "p2" if current_player_key == "p1" else "p1"
-    other_player = battle[other_player_key]
-
-    if user_id != current_player["id"]:
-        await query.answer("It's not your turn!", show_alert=True)
+    # Validate correct player is clicking their own buttons
+    if user_id != battle[player_key]["id"]:
+        await query.answer("These are not your moves!", show_alert=True)
         return
 
-    # Execute Move
-    move = current_player["pkmn"]["moves"][move_index]
-    
-    stab = 1.5 if move["type"] in current_player["pkmn"]["types"] else 1.0
-    damage = calculate_damage(
-        current_player["pkmn"]["level"], 
-        move["power"], 
-        current_player["pkmn"]["stats"], 
-        other_player["pkmn"]["stats"], 
-        move["class"], 
-        stab=stab
-    )
+    # Check if they already locked in
+    if battle["choices"][player_key] is not None:
+        await query.answer("You already locked in your move! Waiting for opponent...", show_alert=True)
+        return
 
-    other_player["pkmn"]["hp"] = max(0, other_player["pkmn"]["hp"] - damage)
-    
-    action_text = f"💥 {current_player['name']}'s {current_player['pkmn']['name']} used {move['name']}!\nDealt {damage} damage."
+    # Lock in move
+    battle["choices"][player_key] = move_index
+    await query.answer("Move locked in!")
 
-    # Swap turns
-    battle["turn"] = other_player_key
-    
-    # Send next turn state by editing the same message
-    await send_battle_state(query.message.chat_id, battle_id, context, action_text=action_text, message_to_edit=query.message)
-    await query.answer()
+    # Check if both have chosen
+    if battle["choices"]["p1"] is not None and battle["choices"]["p2"] is not None:
+        # Resolve turn
+        p1 = battle["p1"]
+        p2 = battle["p2"]
+        p1_move = p1["pkmn"]["moves"][battle["choices"]["p1"]]
+        p2_move = p2["pkmn"]["moves"][battle["choices"]["p2"]]
+        
+        # Speed tiebreaker
+        p1_spd = p1["pkmn"]["stats"]["spd"]
+        p2_spd = p2["pkmn"]["stats"]["spd"]
+        
+        p1_first = True
+        if p2_spd > p1_spd:
+            p1_first = False
+        elif p1_spd == p2_spd:
+            p1_first = random.choice([True, False]) # Speed Tie
+            
+        first = ("p1", p1, p1_move) if p1_first else ("p2", p2, p2_move)
+        second = ("p2", p2, p2_move) if p1_first else ("p1", p1, p1_move)
+        
+        action_text = ""
+        
+        # Resolve first attacker
+        dmg1 = calculate_damage(first[1]["pkmn"]["level"], first[2]["power"], first[1]["pkmn"]["stats"], second[1]["pkmn"]["stats"], first[2]["class"], stab=1.5 if first[2]["type"] in first[1]["pkmn"]["types"] else 1.0)
+        second[1]["pkmn"]["hp"] = max(0, second[1]["pkmn"]["hp"] - dmg1)
+        action_text += f"💨 {first[1]['name']}'s {first[1]['pkmn']['name']} is faster!\n"
+        action_text += f"💥 {first[1]['pkmn']['name']} used {first[2]['name']}! ({dmg1} dmg)\n"
+        
+        # Resolve second attacker if still alive
+        if second[1]["pkmn"]["hp"] > 0:
+            dmg2 = calculate_damage(second[1]["pkmn"]["level"], second[2]["power"], second[1]["pkmn"]["stats"], first[1]["pkmn"]["stats"], second[2]["class"], stab=1.5 if second[2]["type"] in second[1]["pkmn"]["types"] else 1.0)
+            first[1]["pkmn"]["hp"] = max(0, first[1]["pkmn"]["hp"] - dmg2)
+            action_text += f"\n💥 {second[1]['pkmn']['name']} used {second[2]['name']}! ({dmg2} dmg)"
+        else:
+            action_text += f"\n💀 {second[1]['pkmn']['name']} fainted before it could move!"
+            
+        # Reset choices for next turn
+        battle["choices"] = {"p1": None, "p2": None}
+        
+        await send_battle_state(query.message.chat_id, battle_id, context, action_text=action_text, message_to_edit=query.message)
+    else:
+        # Just update the text to say "Waiting for X..."
+        await send_battle_state(query.message.chat_id, battle_id, context, action_text="", message_to_edit=query.message)
