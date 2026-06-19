@@ -63,7 +63,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("⚔️ Join Battle", url=url)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await loading_msg.edit_text(f"⚔️ **{challenger.first_name}** challenged **{target_username}** to a 6v6 Random Battle!\n\nBoth players must click the button below to join the arena in my DMs!", reply_markup=reply_markup, parse_mode="Markdown")
+    await loading_msg.edit_text(f"⚔️ {challenger.first_name} challenged {target_username} to a 6v6 Random Battle!\n\nBoth players must click the button below to join the arena in my DMs!", reply_markup=reply_markup)
 
 async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle_id: str):
     user = update.effective_user
@@ -132,11 +132,11 @@ async def sync_battle_state(battle_id, context):
         
         for p_key in ["p1", "p2"]:
             if battle[p_key]["dm_chat_id"]:
-                try: await context.bot.edit_message_text(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], text=win_text, parse_mode="Markdown")
+                try: await context.bot.edit_message_text(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], text=win_text)
                 except Exception: pass
                 
         try:
-            await context.bot.send_message(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], text=f"🏆 The battle has concluded!\n**{winner}** defeated {loser} in a 6v6 Showdown!", parse_mode="Markdown")
+            await context.bot.send_message(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], text=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!")
         except Exception: pass
         
         del active_battles[battle_id]
