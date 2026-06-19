@@ -96,6 +96,11 @@ async def send_battle_state(chat_id, battle_id, context, action_text="", message
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data.split("_") # move_b_1234_p1_0
+    
+    if len(data) < 5:
+        await query.answer("This battle is from an older version! Please start a new /showdown.", show_alert=True)
+        return
+        
     battle_id = f"{data[1]}_{data[2]}"
     player_key = data[3]
     move_index = int(data[4])
