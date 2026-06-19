@@ -6,6 +6,44 @@ import random
 # Extremely simplified in-memory state. In production, use Redis or MongoDB.
 active_battles = {}
 
+async def battle_timeout_job(context: ContextTypes.DEFAULT_TYPE):
+    battle_id = context.job.data
+    if battle_id not in active_battles:
+        return
+
+    battle = active_battles[battle_id]
+    
+    p1_picked = battle["choices"]["p1"] is not None
+    p2_picked = battle["choices"]["p2"] is not None
+    
+    if not p1_picked and not p2_picked:
+        text = "⌛ Battle timed out! Both players fled."
+    elif p1_picked and not p2_picked:
+        text = f"🏆 {battle['p1']['name']} wins by forfeit! ({battle['p2']['name']} ran away)"
+    elif p2_picked and not p1_picked:
+        text = f"🏆 {battle['p2']['name']} wins by forfeit! ({battle['p1']['name']} ran away)"
+        
+    chat_id = battle["chat_id"]
+    message_id = battle["message_id"]
+    
+    # Clean up state
+    del active_battles[battle_id]
+    
+    # Remove buttons and declare winner
+    try:
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
+    except Exception as e:
+        pass # Message might have been deleted
+
+def reset_timeout(context, battle_id):
+    # Remove existing job if any
+    current_jobs = context.job_queue.get_jobs_by_name(f"timeout_{battle_id}")
+    for job in current_jobs:
+        job.schedule_removal()
+    
+    # Schedule new job for 2 minutes (120 seconds)
+    context.job_queue.run_once(battle_timeout_job, 120, data=battle_id, name=f"timeout_{battle_id}")
+
 async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg.reply_to_message and len(context.args) == 0:
@@ -24,6 +62,8 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     battle_id = f"b_{msg.message_id}"
     active_battles[battle_id] = {
+        "chat_id": msg.chat_id,
+        "message_id": sent_msg.message_id,
         "p1": {"id": challenger.id, "name": challenger.first_name, "pkmn": p1_pokemon},
         "p2_tag": target_username.replace("@", ""),
         "p2": {"id": None, "name": target_username, "pkmn": p2_pokemon}, # We don't know their ID until they click
@@ -31,9 +71,14 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "status": "active"
     }
 
+    # Start the 120 second timeout timer
+    reset_timeout(context, battle_id)
+
     await send_battle_state(msg.chat_id, battle_id, context, message_to_edit=sent_msg)
 
 async def send_battle_state(chat_id, battle_id, context, action_text="", message_to_edit=None):
+    if battle_id not in active_battles:
+        return
     battle = active_battles[battle_id]
     p1 = battle["p1"]
     p2 = battle["p2"]
@@ -48,15 +93,19 @@ async def send_battle_state(chat_id, battle_id, context, action_text="", message
     )
     
     # Check win condition
-    if p1['pkmn']['hp'] <= 0:
-        text += f"🏆 {p2['name']} wins!"
-        if message_to_edit:
-            await message_to_edit.edit_text(text)
+    if p1['pkmn']['hp'] <= 0 or p2['pkmn']['hp'] <= 0:
+        if p1['pkmn']['hp'] <= 0:
+            text += f"🏆 {p2['name']} wins!"
         else:
-            await context.bot.send_message(chat_id=chat_id, text=text)
-        return
-    elif p2['pkmn']['hp'] <= 0:
-        text += f"🏆 {p1['name']} wins!"
+            text += f"🏆 {p1['name']} wins!"
+            
+        del active_battles[battle_id]
+        
+        # Stop timeout timer
+        current_jobs = context.job_queue.get_jobs_by_name(f"timeout_{battle_id}")
+        for job in current_jobs:
+            job.schedule_removal()
+            
         if message_to_edit:
             await message_to_edit.edit_text(text)
         else:
@@ -170,6 +219,9 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             
         # Reset choices for next turn
         battle["choices"] = {"p1": None, "p2": None}
+        
+        # Restart the 120s timeout timer for the new turn
+        reset_timeout(context, battle_id)
         
         await send_battle_state(query.message.chat_id, battle_id, context, action_text=action_text, message_to_edit=query.message)
     else:
