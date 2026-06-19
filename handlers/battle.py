@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from engine import fetch_random_team, calculate_damage
+from utils.type_chart import get_type_multiplier
 import random
 
 active_battles = {}
@@ -106,8 +107,8 @@ def get_player_buttons(battle, player_key, battle_id):
     
     if menu == "main":
         active_pkmn = p_data["team"][p_data["active"]]
-        row1 = [InlineKeyboardButton(f"⚔️ {m['name']}", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
-        row2 = [InlineKeyboardButton(f"⚔️ {m['name']}", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:])]
+        row1 = [InlineKeyboardButton(f"⚔️ {m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
+        row2 = [InlineKeyboardButton(f"⚔️ {m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:])]
         switch_btn = [InlineKeyboardButton(f"🔄 Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
         buttons.extend([row1, row2, switch_btn])
     elif menu in ["switch", "force_switch"]:
@@ -213,6 +214,12 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("You already locked in!", show_alert=True)
         return
 
+    if action_type == "move":
+        move = battle[player_key]["team"][battle[player_key]["active"]]["moves"][int(action_val)]
+        if move["pp"] <= 0:
+            await query.answer("You don't have any PP left for this move!", show_alert=True)
+            return
+            
     battle["choices"][player_key] = {"type": action_type, "index": int(action_val)}
     await query.answer("Locked in!")
 
@@ -262,9 +269,24 @@ async def resolve_turn(battle_id, context, query):
             elif choice["type"] == "move":
                 atk_pkmn, def_pkmn = player["team"][player["active"]], opponent["team"][opponent["active"]]
                 move = atk_pkmn["moves"][choice["index"]]
-                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=1.5 if move["type"] in atk_pkmn["types"] else 1.0)
+                
+                if move["pp"] <= 0:
+                    action_text += f"{atk_pkmn['name']} tried to use {move['name']} but has no PP left!\n"
+                    continue
+                move["pp"] -= 1
+                
+                type_mod = get_type_multiplier(move["type"], def_pkmn["types"])
+                stab = 1.5 if move["type"] in atk_pkmn["types"] else 1.0
+                
+                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=stab, type_mod=type_mod)
                 def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
-                action_text += f"💥 {atk_pkmn['name']} used {move['name']}! ({dmg} dmg)\n"
+                
+                action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
+                if type_mod > 1.0: action_text += "(It's super effective!) "
+                elif type_mod > 0.0 and type_mod < 1.0: action_text += "(It's not very effective...) "
+                elif type_mod == 0.0: action_text += "(It had no effect!) "
+                action_text += f"(-{dmg} HP)\n"
+                
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
                     battle["menus"]["p2" if p_key == "p1" else "p1"] = "force_switch"

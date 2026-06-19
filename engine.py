@@ -32,12 +32,14 @@ async def fetch_random_pokemon(level: int = 50):
                     "name": m_data["name"].replace("-", " ").title(),
                     "power": m_data["power"],
                     "type": m_data["type"]["name"],
-                    "class": m_data["damage_class"]["name"] # 'physical' or 'special'
+                    "class": m_data["damage_class"]["name"], # 'physical' or 'special'
+                    "pp": m_data.get("pp", 10),
+                    "max_pp": m_data.get("pp", 10)
                 })
         
         # Fallback if somehow no damaging moves
         if not move_data:
-            move_data.append({"name": "Tackle", "power": 40, "type": "normal", "class": "physical"})
+            move_data.append({"name": "Tackle", "power": 40, "type": "normal", "class": "physical", "pp": 35, "max_pp": 35})
             
         ivs = roll_ivs()
         # Random EVs per stat (simplified)
