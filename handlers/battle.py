@@ -15,7 +15,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Simplified target resolution
     target_username = context.args[0] if context.args else msg.reply_to_message.from_user.username
 
-    await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a Random Battle!\n\nGenerating teams...")
+    sent_msg = await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a Random Battle!\n\nGenerating teams...")
 
     # Generate 1v1 Random Battle
     p1_pokemon = await fetch_random_pokemon()
@@ -30,14 +30,18 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "status": "active"
     }
 
-    await send_battle_state(msg.chat_id, battle_id, context)
+    await send_battle_state(msg.chat_id, battle_id, context, message_to_edit=sent_msg)
 
-async def send_battle_state(chat_id, battle_id, context):
+async def send_battle_state(chat_id, battle_id, context, action_text="", message_to_edit=None):
     battle = active_battles[battle_id]
     p1 = battle["p1"]
     p2 = battle["p2"]
     
-    text = (
+    text = ""
+    if action_text:
+        text += f"{action_text}\n\n"
+
+    text += (
         f"🔴 {p1['name']}'s {p1['pkmn']['name']}: {p1['pkmn']['hp']}/{p1['pkmn']['max_hp']} HP\n"
         f"🔵 {p2['name']}'s {p2['pkmn']['name']}: {p2['pkmn']['hp']}/{p2['pkmn']['max_hp']} HP\n\n"
     )
@@ -45,11 +49,17 @@ async def send_battle_state(chat_id, battle_id, context):
     # Check win condition
     if p1['pkmn']['hp'] <= 0:
         text += f"🏆 {p2['name']} wins!"
-        await context.bot.send_message(chat_id=chat_id, text=text)
+        if message_to_edit:
+            await message_to_edit.edit_text(text)
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=text)
         return
     elif p2['pkmn']['hp'] <= 0:
         text += f"🏆 {p1['name']} wins!"
-        await context.bot.send_message(chat_id=chat_id, text=text)
+        if message_to_edit:
+            await message_to_edit.edit_text(text)
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=text)
         return
 
     # Determine whose turn it is
@@ -61,7 +71,10 @@ async def send_battle_state(chat_id, battle_id, context):
         keyboard.append([InlineKeyboardButton(f"{move['name']} ({move['power']} BP)", callback_data=f"move_{battle_id}_{i}")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    if message_to_edit:
+        await message_to_edit.edit_text(text, reply_markup=reply_markup)
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
 
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -105,10 +118,11 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     other_player["pkmn"]["hp"] = max(0, other_player["pkmn"]["hp"] - damage)
     
-    await query.message.edit_text(f"💥 {current_player['name']}'s {current_player['pkmn']['name']} used {move['name']}!\nDealt {damage} damage.")
+    action_text = f"💥 {current_player['name']}'s {current_player['pkmn']['name']} used {move['name']}!\nDealt {damage} damage."
 
     # Swap turns
     battle["turn"] = other_player_key
     
-    # Send next turn state
-    await send_battle_state(query.message.chat_id, battle_id, context)
+    # Send next turn state by editing the same message
+    await send_battle_state(query.message.chat_id, battle_id, context, action_text=action_text, message_to_edit=query.message)
+    await query.answer()
