@@ -2,6 +2,8 @@ import logging
 from telegram.ext import Application, CommandHandler
 import config
 from handlers.start import start_command
+from handlers.battle import showdown_command, handle_move_callback
+from telegram.ext import CallbackQueryHandler
 
 # Enable logging
 logging.basicConfig(
@@ -19,6 +21,8 @@ def main():
 
     # on different commands - answer in Telegram
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("showdown", showdown_command))
+    application.add_handler(CallbackQueryHandler(handle_move_callback, pattern="^move_"))
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot...")
