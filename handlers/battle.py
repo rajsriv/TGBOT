@@ -15,7 +15,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Simplified target resolution
     target_username = context.args[0] if context.args else msg.reply_to_message.from_user.username
 
-    await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a Random Battle!\n\nGenerating teams...", quote=False)
+    await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a Random Battle!\n\nGenerating teams...")
 
     # Generate 1v1 Random Battle
     p1_pokemon = await fetch_random_pokemon()
