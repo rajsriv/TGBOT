@@ -22,7 +22,7 @@ def main():
     # on different commands - answer in Telegram
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("showdown", showdown_command))
-    application.add_handler(CallbackQueryHandler(handle_move_callback, pattern="^move_"))
+    application.add_handler(CallbackQueryHandler(handle_move_callback, pattern="^btn_"))
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot...")
