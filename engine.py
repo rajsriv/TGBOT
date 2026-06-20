@@ -50,6 +50,11 @@ async def fetch_random_pokemon(level: int = 50):
         sp_def = calc_stat(base_stats.get("special-defense", 50), ivs["sp_def"], 85, level)
         spd = calc_stat(base_stats.get("speed", 50), ivs["spd"], 85, level)
         
+        abilities = [a["ability"]["name"] for a in data["abilities"]]
+        ability = random.choice(abilities).replace("-", " ").title() if abilities else "None"
+        items = ["Leftovers", "Life Orb", "Sitrus Berry", "Expert Belt", "Focus Sash", "None"]
+        item = random.choice(items)
+        
         return {
             "name": data["name"].capitalize(),
             "level": level,
@@ -57,7 +62,9 @@ async def fetch_random_pokemon(level: int = 50):
             "max_hp": hp,
             "stats": {"atk": atk, "def": defense, "sp_atk": sp_atk, "sp_def": sp_def, "spd": spd},
             "types": types,
-            "moves": move_data
+            "moves": move_data,
+            "ability": ability,
+            "item": item
         }
 
 def calculate_damage(level, power, attacker_stats, defender_stats, move_class, stab=1.0, type_mod=1.0):

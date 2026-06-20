@@ -165,6 +165,7 @@ async def update_player_dm(battle_id, context, player_key):
     
     text += (
         f"▛ Your {my_active['name']}: {my_active['hp']}/{my_active['max_hp']} HP (Poké: {me_alive}/6)\n"
+        f"╰ Item: {my_active['item']} | Ability: {my_active['ability']}\n"
         f"▙ Enemy {opp_active['name']}: {int(opp_active['hp']/opp_active['max_hp']*100)}% HP (Poké: {opp_alive}/6)\n\n"
     )
     
@@ -276,9 +277,42 @@ async def resolve_turn(battle_id, context, query):
                 move["pp"] -= 1
                 
                 type_mod = get_type_multiplier(move["type"], def_pkmn["types"])
+                
+                # Abilities (Defender)
+                if def_pkmn["ability"] == "Levitate" and move["type"] == "ground":
+                    type_mod = 0.0
+                    
                 stab = 1.5 if move["type"] in atk_pkmn["types"] else 1.0
                 
+                # Abilities (Attacker)
+                if atk_pkmn["hp"] <= atk_pkmn["max_hp"] / 3:
+                    if atk_pkmn["ability"] == "Overgrow" and move["type"] == "grass": stab *= 1.5
+                    elif atk_pkmn["ability"] == "Blaze" and move["type"] == "fire": stab *= 1.5
+                    elif atk_pkmn["ability"] == "Torrent" and move["type"] == "water": stab *= 1.5
+                    elif atk_pkmn["ability"] == "Swarm" and move["type"] == "bug": stab *= 1.5
+                
                 dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=stab, type_mod=type_mod)
+                
+                # Items (Attacker)
+                if atk_pkmn["item"] == "Expert Belt" and type_mod > 1.0:
+                    dmg = int(dmg * 1.2)
+                elif atk_pkmn["item"] == "Life Orb":
+                    dmg = int(dmg * 1.3)
+                    
+                # Abilities (Defender) passive
+                if move["class"] == "physical" and def_pkmn["ability"] == "Intimidate":
+                    dmg = int(dmg * 0.67)
+                    
+                # Items/Abilities preventing OHKO
+                if dmg >= def_pkmn["hp"] and def_pkmn["hp"] == def_pkmn["max_hp"]:
+                    if def_pkmn["item"] == "Focus Sash":
+                        dmg = def_pkmn["hp"] - 1
+                        def_pkmn["item"] = "None"
+                        action_text += f"🎗️ {def_pkmn['name']} hung on using its Focus Sash!\n"
+                    elif def_pkmn["ability"] == "Sturdy":
+                        dmg = def_pkmn["hp"] - 1
+                        action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
+                        
                 def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
                 
                 action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
@@ -287,11 +321,34 @@ async def resolve_turn(battle_id, context, query):
                 elif type_mod == 0.0: action_text += "(It had no effect!) "
                 action_text += f"(-{dmg} HP)\n"
                 
+                # Items (Defender) after damage
+                if def_pkmn["hp"] > 0 and def_pkmn["hp"] <= def_pkmn["max_hp"] / 2 and def_pkmn["item"] == "Sitrus Berry":
+                    heal = int(def_pkmn["max_hp"] / 4)
+                    def_pkmn["hp"] = min(def_pkmn["max_hp"], def_pkmn["hp"] + heal)
+                    def_pkmn["item"] = "None"
+                    action_text += f"🫐 {def_pkmn['name']} restored health using its Sitrus Berry!\n"
+                    
+                # Life Orb Recoil
+                if atk_pkmn["item"] == "Life Orb" and dmg > 0:
+                    atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - int(atk_pkmn["max_hp"] * 0.1))
+                    action_text += f"🔮 {atk_pkmn['name']} lost some HP to its Life Orb!\n"
+                    if atk_pkmn["hp"] == 0:
+                        action_text += f"💀 {atk_pkmn['name']} fainted from Life Orb recoil!\n"
+                        battle["menus"][p_key] = "force_switch"
+                
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
                     battle["menus"]["p2" if p_key == "p1" else "p1"] = "force_switch"
                     
         battle["choices"] = {"p1": None, "p2": None}
+        
+        # End of turn effects
+        for p_key in ["p1", "p2"]:
+            active = battle[p_key]["team"][battle[p_key]["active"]]
+            if active["hp"] > 0 and active["hp"] < active["max_hp"] and active["item"] == "Leftovers":
+                heal = max(1, int(active["max_hp"] / 16))
+                active["hp"] = min(active["max_hp"], active["hp"] + heal)
+                action_text += f"🍏 {active['name']} restored a little HP using Leftovers!\n"
         
     reset_timeout(context, battle_id)
     battle["action_text"] = action_text
