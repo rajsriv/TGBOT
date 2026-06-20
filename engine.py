@@ -55,6 +55,11 @@ async def fetch_random_pokemon(level: int = 50):
         items = ["Leftovers", "Life Orb", "Sitrus Berry", "Expert Belt", "Focus Sash", "None"]
         item = random.choice(items)
         
+        # Download sprite
+        sprite_url = data["sprites"]["front_default"]
+        sprite_resp = await client.get(sprite_url)
+        sprite_bytes = sprite_resp.content
+        
         return {
             "name": data["name"].capitalize(),
             "level": level,
@@ -64,7 +69,8 @@ async def fetch_random_pokemon(level: int = 50):
             "types": types,
             "moves": move_data,
             "ability": ability,
-            "item": item
+            "item": item,
+            "sprite": sprite_bytes
         }
 
 def calculate_damage(level, power, attacker_stats, defender_stats, move_class, stab=1.0, type_mod=1.0):

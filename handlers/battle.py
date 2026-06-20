@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from engine import fetch_random_team, calculate_damage
 from utils.type_chart import get_type_multiplier
+from utils.card_generator import generate_trainer_card
 from database import db
 import random
 
@@ -21,7 +22,7 @@ async def battle_timeout_job(context: ContextTypes.DEFAULT_TYPE):
         
     for p_key in ["p1", "p2"]:
         if battle[p_key]["dm_chat_id"]:
-            try: await context.bot.edit_message_text(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], text=text)
+            try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=text)
             except Exception: pass
             
     try:
@@ -88,14 +89,16 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
         return
         
     battle[player_key]["dm_chat_id"] = update.message.chat_id
-    dm_msg = await update.message.reply_text("Loading arena...")
+    
+    card_bytes = generate_trainer_card({"_id": user.id, "username": user.first_name}, battle[player_key]["team"])
+    dm_msg = await update.message.reply_photo(photo=card_bytes, caption="Loading arena...")
     battle[player_key]["dm_msg_id"] = dm_msg.message_id
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
         reset_timeout(context, battle_id)
         await sync_battle_state(battle_id, context)
     else:
-        await dm_msg.edit_text("⌛ Waiting for your opponent to join...")
+        await context.bot.edit_message_caption(chat_id=battle[player_key]["dm_chat_id"], message_id=battle[player_key]["dm_msg_id"], caption="⌛ Waiting for your opponent to join...")
 
 def get_player_buttons(battle, player_key, battle_id):
     opponent_key = "p2" if player_key == "p1" else "p1"
@@ -159,11 +162,14 @@ async def sync_battle_state(battle_id, context):
         
         for p_key in ["p1", "p2"]:
             if battle[p_key]["dm_chat_id"]:
-                try: await context.bot.edit_message_text(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], text=win_text)
+                try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=win_text)
                 except Exception: pass
                 
         try:
-            await context.bot.send_message(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], text=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!{elo_text}")
+            winner_key = "p2" if p1_alive == 0 else "p1"
+            winner_user = {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
+            winner_card = generate_trainer_card(winner_user, battle[winner_key]["team"])
+            await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!{elo_text}")
         except Exception: pass
         
         del active_battles[battle_id]
@@ -208,7 +214,7 @@ async def update_player_dm(battle_id, context, player_key):
     keyboard = get_player_buttons(battle, player_key, battle_id)
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
     
-    try: await context.bot.edit_message_text(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], text=text, reply_markup=reply_markup)
+    try: await context.bot.edit_message_caption(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], caption=text, reply_markup=reply_markup)
     except Exception: pass
 
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
