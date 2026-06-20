@@ -324,9 +324,18 @@ async def resolve_turn(battle_id, context, query):
             if c["type"] == "switch": return 1000000
             
             pkmn = battle[p]["team"][battle[p]["active"]]
-            spd = pkmn["stats"]["spd"] * get_stat_multiplier(pkmn["stat_stages"].get("spd", 0))
-            if pkmn.get("status") == "paralyzed": spd *= 0.5
-            return spd + random.uniform(0, 0.99)
+            base_spd = pkmn["stats"]["spd"] * get_stat_multiplier(pkmn["stat_stages"].get("spd", 0))
+            if pkmn.get("status") == "paralyzed": base_spd *= 0.5
+            
+            prio = base_spd + random.uniform(0, 0.99)
+            if c["type"] == "move":
+                move_name = pkmn["moves"][c["index"]]["name"].lower()
+                if move_name in ["protect", "detect"]:
+                    prio += 10000
+                elif move_name in ["fake out", "extreme speed", "quick attack", "mach punch", "bullet punch", "ice shard", "aqua jet", "sucker punch"]:
+                    prio += 5000
+            return prio
+            
         actions.sort(key=priority, reverse=True)
         
         for p_key, choice in actions:
@@ -343,6 +352,11 @@ async def resolve_turn(battle_id, context, query):
                 move = atk_pkmn["moves"][choice["index"]]
                 
                 # Pre-attack status checks
+                if "flinch" in atk_pkmn.get("volatile_status", []):
+                    action_text += f"{atk_pkmn['name']} flinched and couldn't move!\n"
+                    atk_pkmn["volatile_status"].remove("flinch")
+                    continue
+                    
                 if atk_pkmn.get("status") == "paralyzed" and random.randint(1, 100) <= 25:
                     action_text += f"⚡ {atk_pkmn['name']} is fully paralyzed and can't move!\n"
                     continue
@@ -365,6 +379,19 @@ async def resolve_turn(battle_id, context, query):
                     action_text += f"{atk_pkmn['name']} tried to use {move['name']} but has no PP left!\n"
                     continue
                 move["pp"] -= 1
+                
+                if move["name"].lower() in ["protect", "detect"]:
+                    if "protect" not in atk_pkmn.get("volatile_status", []):
+                        atk_pkmn.setdefault("volatile_status", []).append("protect")
+                        action_text += f"🛡️ {atk_pkmn['name']} protected itself!\n"
+                    else:
+                        action_text += f"💥 {atk_pkmn['name']}'s {move['name']} failed!\n"
+                    continue
+                    
+                # Defender is protecting?
+                if "protect" in def_pkmn.get("volatile_status", []):
+                    action_text += f"{atk_pkmn['name']} tried to use {move['name']}, but {def_pkmn['name']} protected itself!\n"
+                    continue
                 
                 acc = move.get("accuracy", "-")
                 if acc != "-" and isinstance(acc, int):
@@ -484,6 +511,12 @@ async def resolve_turn(battle_id, context, query):
                     elif move["type"] == "ice" and random.randint(1, 100) <= 10:
                         def_pkmn["status"] = "frozen"
                         action_text += f"🧊 {def_pkmn['name']} was frozen solid!\n"
+                        
+                if def_pkmn["hp"] > 0 and type_mod > 0 and move["class"] == "physical":
+                    if move["name"].lower() in ["bite", "headbutt", "rock slide", "waterfall", "iron head", "air slash", "dark pulse", "fake out"]:
+                        if random.randint(1, 100) <= 30:
+                            if "flinch" not in def_pkmn.setdefault("volatile_status", []):
+                                def_pkmn["volatile_status"].append("flinch")
                 
                 # Items (Defender) after damage
                 if def_pkmn["hp"] > 0 and def_pkmn["hp"] <= def_pkmn["max_hp"] / 2 and def_pkmn["item"] == "Sitrus Berry":
@@ -509,6 +542,13 @@ async def resolve_turn(battle_id, context, query):
         # End of turn effects
         for p_key in ["p1", "p2"]:
             active = battle[p_key]["team"][battle[p_key]["active"]]
+            
+            # Clear volatile statuses like protect and flinch at the end of the turn
+            if "protect" in active.get("volatile_status", []):
+                active["volatile_status"].remove("protect")
+            if "flinch" in active.get("volatile_status", []):
+                active["volatile_status"].remove("flinch")
+                
             if active["hp"] <= 0: continue
             
             if active.get("status") in ["burned", "poisoned"]:
