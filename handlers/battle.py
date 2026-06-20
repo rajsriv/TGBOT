@@ -107,16 +107,16 @@ def get_player_buttons(battle, player_key, battle_id):
     
     if menu == "main":
         active_pkmn = p_data["team"][p_data["active"]]
-        row1 = [InlineKeyboardButton(f"⚔️ {m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
-        row2 = [InlineKeyboardButton(f"⚔️ {m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:])]
-        switch_btn = [InlineKeyboardButton(f"🔄 Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
+        row1 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
+        row2 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:], start=2)]
+        switch_btn = [InlineKeyboardButton(f"Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
         buttons.extend([row1, row2, switch_btn])
     elif menu in ["switch", "force_switch"]:
         for i, pkmn in enumerate(p_data["team"]):
             if i != p_data["active"] and pkmn["hp"] > 0:
                 buttons.append([InlineKeyboardButton(f"🐾 {pkmn['name']} ({pkmn['hp']}/{pkmn['max_hp']})", callback_data=f"btn_{battle_id}_{player_key}_switch_{i}")])
         if menu == "switch":
-            buttons.append([InlineKeyboardButton(f"⬅️ Back", callback_data=f"btn_{battle_id}_{player_key}_menu_main")])
+            buttons.append([InlineKeyboardButton(f"⬅◁ Back", callback_data=f"btn_{battle_id}_{player_key}_menu_main")])
     return buttons
 
 async def sync_battle_state(battle_id, context):
@@ -164,8 +164,8 @@ async def update_player_dm(battle_id, context, player_key):
     opp_alive = sum(1 for p in opp["team"] if p["hp"] > 0)
     
     text += (
-        f"🟢 Your {my_active['name']}: {my_active['hp']}/{my_active['max_hp']} HP (Poké: {me_alive}/6)\n"
-        f"🔴 Enemy {opp_active['name']}: {int(opp_active['hp']/opp_active['max_hp']*100)}% HP (Poké: {opp_alive}/6)\n\n"
+        f"▛ Your {my_active['name']}: {my_active['hp']}/{my_active['max_hp']} HP (Poké: {me_alive}/6)\n"
+        f"▙ Enemy {opp_active['name']}: {int(opp_active['hp']/opp_active['max_hp']*100)}% HP (Poké: {opp_alive}/6)\n\n"
     )
     
     thinking = []
@@ -175,8 +175,8 @@ async def update_player_dm(battle_id, context, player_key):
         if battle["choices"][player_key] is None and len(get_player_buttons(battle, player_key, battle_id)) > 0: thinking.append(me["name"])
         if battle["choices"][opponent_key] is None and len(get_player_buttons(battle, opponent_key, battle_id)) > 0: thinking.append(opp["name"])
         
-    if len(thinking) == 2: text += f"👉 Both players making choices..."
-    elif len(thinking) == 1: text += f"⌛ Waiting for {thinking[0]}..."
+    if len(thinking) == 2: text += f"■ Both players making choices..."
+    elif len(thinking) == 1: text += f"Waiting for {thinking[0]}..."
     
     keyboard = get_player_buttons(battle, player_key, battle_id)
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
