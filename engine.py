@@ -121,6 +121,8 @@ async def fetch_random_pokemon(level: int = None):
         }
 
 def calculate_damage(level, power, attacker_stats, defender_stats, move_class, stab=1.0, type_mod=1.0, crit=1.0):
+    if power <= 0:
+        return 0
     a = attacker_stats["atk"] if move_class == "physical" else attacker_stats["sp_atk"]
     d = defender_stats["def"] if move_class == "physical" else defender_stats["sp_def"]
     
