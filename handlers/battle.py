@@ -441,6 +441,10 @@ async def resolve_turn(battle_id, context, query):
                     action_text += f"{atk_pkmn['name']} tried to use {move['name']} but has no PP left!\n"
                     continue
                     
+                if move["name"].lower() == "steel roller":
+                    action_text += f"{atk_pkmn['name']} tried to use Steel Roller, but it failed without Terrain!\n"
+                    continue
+                    
                 # Charging Moves
                 is_charging_move = move["name"].lower() in ["solar beam", "fly", "dig", "dive", "bounce", "skull bash", "razor wind", "sky attack"]
                 if is_charging_move and "charging" not in atk_pkmn.get("volatile_status", []):
@@ -570,7 +574,12 @@ async def resolve_turn(battle_id, context, query):
                 
                 # Apply Stat Changes
                 for sc in move.get("stat_changes", []):
-                    target_pkmn = atk_pkmn if move["target"] in ["user", "user-and-allies"] else def_pkmn
+                    stat_chance = move.get("stat_chance", 100)
+                    if random.randint(1, 100) > stat_chance: continue
+                    
+                    stat_target = move.get("stat_target", move.get("target", "selected-pokemon"))
+                    target_pkmn = atk_pkmn if stat_target in ["user", "user-and-allies"] else def_pkmn
+                    
                     stat_name = sc["stat"]
                     change = sc["change"]
                     
