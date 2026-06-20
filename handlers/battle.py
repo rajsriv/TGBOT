@@ -138,7 +138,7 @@ async def sync_battle_state(battle_id, context):
         
         winner = battle["p2"]["name"] if p1_alive == 0 else battle["p1"]["name"]
         loser = battle["p1"]["name"] if p1_alive == 0 else battle["p2"]["name"]
-        win_text = f"{battle['action_text']}\n\n🏆 **{winner}** wins the battle!"
+        win_text = f"{battle['action_text']}\n\n🏆 <b>{winner}</b> wins the battle!"
         
         # Calculate Elo and update DB
         p1_db = await db.get_user(battle["p1"]["id"])
@@ -164,14 +164,14 @@ async def sync_battle_state(battle_id, context):
         
         for p_key in ["p1", "p2"]:
             if battle[p_key]["dm_chat_id"]:
-                try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=win_text)
+                try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=win_text, parse_mode="HTML")
                 except Exception: pass
                 
         try:
             winner_key = "p2" if p1_alive == 0 else "p1"
             winner_user = {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
             winner_card = generate_trainer_card(winner_user, battle[winner_key]["team"])
-            await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!{elo_text}")
+            await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n<b>{winner}</b> defeated <b>{loser}</b> in a 6v6 Showdown!{elo_text}", parse_mode="HTML")
         except Exception: pass
         
         del active_battles[battle_id]
