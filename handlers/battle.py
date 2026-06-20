@@ -17,10 +17,19 @@ async def battle_timeout_job(context: ContextTypes.DEFAULT_TYPE):
     p1_picked = battle["choices"]["p1"] is not None
     p2_picked = battle["choices"]["p2"] is not None
     
-    if not p1_picked and not p2_picked: text = "⌛ Battle timed out! Both players fled."
-    elif p1_picked and not p2_picked: text = f"🏆 {battle['p1']['name']} wins by forfeit! ({battle['p2']['name']} ran away)"
-    elif p2_picked and not p1_picked: text = f"🏆 {battle['p2']['name']} wins by forfeit! ({battle['p1']['name']} ran away)"
+    if p1_picked and not p2_picked:
+        battle["action_text"] = f"{battle['p2']['name']} fled the battle!"
+        for pkmn in battle["p2"]["team"]: pkmn["hp"] = 0
+        await sync_battle_state(battle_id, context)
+        return
+    elif p2_picked and not p1_picked:
+        battle["action_text"] = f"{battle['p1']['name']} fled the battle!"
+        for pkmn in battle["p1"]["team"]: pkmn["hp"] = 0
+        await sync_battle_state(battle_id, context)
+        return
         
+    # Both fled or never joined
+    text = "⌛ Battle timed out! Both players fled."
     for p_key in ["p1", "p2"]:
         if battle[p_key]["dm_chat_id"]:
             try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=text)
@@ -113,6 +122,10 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
     if not player_key:
         await update.message.reply_text("You are not a participant in this battle!")
         return
+        
+    user_db = await db.get_user(user.id)
+    if not user_db:
+        await db.create_user(user.id, user.username or user.first_name)
         
     battle[player_key]["dm_chat_id"] = update.message.chat_id
     
