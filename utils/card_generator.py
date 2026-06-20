@@ -78,11 +78,17 @@ def generate_trainer_card(user_data, team=None):
         
         draw.text((40, y_start), "ELO", font=text_font, fill="#4a4a4a")
         draw.text((40, y_start + spacing), "WIN/LOSS", font=text_font, fill="#4a4a4a")
-        draw.text((40, y_start + spacing * 2), "DMG DEALT", font=text_font, fill="#4a4a4a")
+        draw.text((40, y_start + spacing * 2), "AVG DMG", font=text_font, fill="#4a4a4a")
+        
+        wins = user_data.get('wins', 0)
+        losses = user_data.get('losses', 0)
+        total_dmg = user_data.get('total_damage', 0)
+        total_battles = wins + losses
+        avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
         
         draw.text((220, y_start), str(user_data.get('elo', 1000)), font=text_font, fill="#4a4a4a")
-        draw.text((220, y_start + spacing), f"{user_data.get('wins', 0)} / {user_data.get('losses', 0)}", font=text_font, fill="#4a4a4a")
-        draw.text((220, y_start + spacing * 2), str(user_data.get('total_damage', 0)), font=text_font, fill="#4a4a4a")
+        draw.text((220, y_start + spacing), f"{wins} / {losses}", font=text_font, fill="#4a4a4a")
+        draw.text((220, y_start + spacing * 2), str(avg_dmg), font=text_font, fill="#4a4a4a")
     
     # Save to bytes
     bio = io.BytesIO()
