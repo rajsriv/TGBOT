@@ -423,6 +423,7 @@ async def resolve_turn(battle_id, context, query):
                 def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
                 
                 action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
+                if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
                 if type_mod > 1.0: action_text += "(It's super effective!) "
                 elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
                 elif type_mod == 0: action_text += "(It had no effect...) "
