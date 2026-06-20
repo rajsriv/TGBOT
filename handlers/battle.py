@@ -339,6 +339,12 @@ async def resolve_turn(battle_id, context, query):
                     continue
                 move["pp"] -= 1
                 
+                acc = move.get("accuracy", "-")
+                if acc != "-" and isinstance(acc, int):
+                    if random.randint(1, 100) > acc:
+                        action_text += f"💥 {atk_pkmn['name']}'s {move['name']} missed!\n"
+                        continue
+                
                 type_mod = get_type_multiplier(move["type"], def_pkmn["types"])
                 
                 # Abilities (Defender)
