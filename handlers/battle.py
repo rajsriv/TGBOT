@@ -1,6 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from engine import fetch_random_team, calculate_damage
+from utils.formulas import get_stat_multiplier
 from utils.type_chart import get_type_multiplier
 from utils.card_generator import generate_trainer_card
 from database import db
@@ -321,8 +322,10 @@ async def resolve_turn(battle_id, context, query):
         def priority(action):
             p, c = action
             if c["type"] == "switch": return 1000000
-            spd = battle[p]["team"][battle[p]["active"]]["stats"]["spd"]
-            if battle[p]["team"][battle[p]["active"]].get("status") == "paralyzed": spd *= 0.5
+            
+            pkmn = battle[p]["team"][battle[p]["active"]]
+            spd = pkmn["stats"]["spd"] * get_stat_multiplier(pkmn["stat_stages"].get("spd", 0))
+            if pkmn.get("status") == "paralyzed": spd *= 0.5
             return spd + random.uniform(0, 0.99)
         actions.sort(key=priority, reverse=True)
         
@@ -389,9 +392,25 @@ async def resolve_turn(battle_id, context, query):
                     is_crit = True
                 crit_mod = 1.5 if is_crit else 1.0
                 
-                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=stab, type_mod=type_mod, crit=crit_mod)
+                # Apply stat stages
+                atk_stats = atk_pkmn["stats"].copy()
+                def_stats = def_pkmn["stats"].copy()
                 
-                if is_crit:
+                # Critical hits ignore attacker's negative stages and defender's positive stages
+                if move["class"] == "physical":
+                    atk_stage = max(0, atk_pkmn["stat_stages"]["atk"]) if is_crit else atk_pkmn["stat_stages"]["atk"]
+                    def_stage = min(0, def_pkmn["stat_stages"]["def"]) if is_crit else def_pkmn["stat_stages"]["def"]
+                    atk_stats["atk"] = int(atk_stats["atk"] * get_stat_multiplier(atk_stage))
+                    def_stats["def"] = int(def_stats["def"] * get_stat_multiplier(def_stage))
+                else:
+                    atk_stage = max(0, atk_pkmn["stat_stages"]["sp_atk"]) if is_crit else atk_pkmn["stat_stages"]["sp_atk"]
+                    def_stage = min(0, def_pkmn["stat_stages"]["sp_def"]) if is_crit else def_pkmn["stat_stages"]["sp_def"]
+                    atk_stats["sp_atk"] = int(atk_stats["sp_atk"] * get_stat_multiplier(atk_stage))
+                    def_stats["sp_def"] = int(def_stats["sp_def"] * get_stat_multiplier(def_stage))
+                
+                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod)
+                
+                if is_crit and move["power"] > 0:
                     action_text += "A critical hit! "
                 
                 # Items (Attacker)
@@ -422,12 +441,34 @@ async def resolve_turn(battle_id, context, query):
                 battle[p_key]["damage_dealt"] += actual_dmg
                 def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
                 
-                action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
-                if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
-                if type_mod > 1.0: action_text += "(It's super effective!) "
-                elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
-                elif type_mod == 0: action_text += "(It had no effect...) "
-                action_text += f"(-{actual_dmg} HP)\n"
+                if move["power"] > 0:
+                    action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
+                    if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
+                    if type_mod > 1.0: action_text += "(It's super effective!) "
+                    elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
+                    elif type_mod == 0: action_text += "(It had no effect...) "
+                    action_text += f"(-{actual_dmg} HP)\n"
+                else:
+                    action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\n"
+                
+                # Apply Stat Changes
+                for sc in move.get("stat_changes", []):
+                    target_pkmn = atk_pkmn if move["target"] in ["user", "user-and-allies"] else def_pkmn
+                    stat_name = sc["stat"]
+                    change = sc["change"]
+                    
+                    if target_pkmn["hp"] <= 0: continue
+                    
+                    old_stage = target_pkmn["stat_stages"].get(stat_name, 0)
+                    new_stage = max(-6, min(6, old_stage + change))
+                    
+                    if new_stage == old_stage:
+                        action_text += f"{target_pkmn['name']}'s {stat_name} won't go any {'higher' if change > 0 else 'lower'}!\n"
+                    else:
+                        target_pkmn["stat_stages"][stat_name] = new_stage
+                        direction = "rose" if change > 0 else "fell"
+                        degree = "sharply " if abs(change) > 1 else ""
+                        action_text += f"📈 {target_pkmn['name']}'s {stat_name} {degree}{direction}!\n"
                 
                 # Secondary Effects
                 if def_pkmn["hp"] > 0 and type_mod > 0 and not def_pkmn.get("status"):

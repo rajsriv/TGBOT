@@ -11,6 +11,12 @@ def roll_ivs() -> dict:
     stats = ["hp", "atk", "def", "sp_atk", "sp_def", "spd"]
     return {s: random.randint(0, 31) for s in stats}
 
+def get_stat_multiplier(stage: int) -> float:
+    stage = max(-6, min(6, stage))
+    if stage >= 0:
+        return (2 + stage) / 2.0
+    return 2.0 / (2 - stage)
+
 BALL_RATES = { "pokeball": 1, "greatball": 1.5, "ultraball": 2, "masterball": 255 }
 
 def catch_chance(pokemon_catch_rate: int, ball_modifier: float, hp_max: int, hp_current: int, status: float = 1.0) -> bool:

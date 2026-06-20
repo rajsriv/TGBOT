@@ -27,20 +27,32 @@ async def fetch_random_pokemon(level: int = 50):
             # Fetch move info
             m_resp = await client.get(m["move"]["url"])
             m_data = m_resp.json()
-            if m_data.get("power"): # Only take moves that do damage
+            if m_data.get("power") or m_data.get("stat_changes"):
+                stat_map = {"attack": "atk", "defense": "def", "special-attack": "sp_atk", "special-defense": "sp_def", "speed": "spd"}
+                stat_changes = []
+                for sc in m_data.get("stat_changes", []):
+                    mapped_stat = stat_map.get(sc["stat"]["name"])
+                    if mapped_stat:
+                        stat_changes.append({"stat": mapped_stat, "change": sc["change"]})
+                        
                 move_data.append({
                     "name": m_data["name"].replace("-", " ").title(),
-                    "power": m_data["power"],
+                    "power": m_data.get("power", 0) or 0,
                     "accuracy": m_data.get("accuracy", "-") or "-",
                     "type": m_data["type"]["name"],
-                    "class": m_data["damage_class"]["name"], # 'physical' or 'special'
+                    "class": m_data["damage_class"]["name"], # 'physical', 'special', 'status'
                     "pp": m_data.get("pp", 10),
-                    "max_pp": m_data.get("pp", 10)
+                    "max_pp": m_data.get("pp", 10),
+                    "stat_changes": stat_changes,
+                    "target": m_data["target"]["name"]
                 })
         
         # Fallback if somehow no damaging moves
-        if not move_data:
-            move_data.append({"name": "Tackle", "power": 40, "accuracy": 100, "type": "normal", "class": "physical", "pp": 35, "max_pp": 35})
+        if not any(m["power"] > 0 for m in move_data):
+            move_data.append({"name": "Tackle", "power": 40, "accuracy": 100, "type": "normal", "class": "physical", "pp": 35, "max_pp": 35, "stat_changes": [], "target": "selected-pokemon"})
+            
+        if len(move_data) > 4:
+            move_data = move_data[:4]
             
         ivs = roll_ivs()
         # Random EVs per stat (simplified)
@@ -67,6 +79,7 @@ async def fetch_random_pokemon(level: int = 50):
             "hp": hp,
             "max_hp": hp,
             "stats": {"atk": atk, "def": defense, "sp_atk": sp_atk, "sp_def": sp_def, "spd": spd},
+            "stat_stages": {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0},
             "types": types,
             "moves": move_data,
             "ability": ability,
