@@ -489,7 +489,18 @@ async def resolve_turn(battle_id, context, query):
                 
                 acc = move.get("accuracy", "-")
                 if acc != "-" and isinstance(acc, int):
-                    if random.randint(1, 100) > acc:
+                    atk_acc_stage = atk_pkmn.get("stat_stages", {}).get("accuracy", 0)
+                    def_eva_stage = def_pkmn.get("stat_stages", {}).get("evasion", 0)
+                    net_stage = max(-6, min(6, atk_acc_stage - def_eva_stage))
+                    
+                    if net_stage > 0:
+                        acc_multiplier = (3 + net_stage) / 3.0
+                    else:
+                        acc_multiplier = 3.0 / (3 - net_stage)
+                        
+                    final_acc = int(acc * acc_multiplier)
+                    
+                    if random.randint(1, 100) > final_acc:
                         action_text += f"💥 {atk_pkmn['name']}'s {move['name']} missed!\n"
                         continue
                 

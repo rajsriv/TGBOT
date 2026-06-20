@@ -36,7 +36,10 @@ async def fetch_random_pokemon(level: int = None):
             m_resp = await client.get(m["move"]["url"])
             m_data = m_resp.json()
             if m_data.get("power") or m_data.get("stat_changes") or m_data["name"] in ["protect", "detect"]:
-                stat_map = {"attack": "atk", "defense": "def", "special-attack": "sp_atk", "special-defense": "sp_def", "speed": "spd"}
+                stat_map = {
+                    "attack": "atk", "defense": "def", "special-attack": "sp_atk", 
+                    "special-defense": "sp_def", "speed": "spd", "accuracy": "accuracy", "evasion": "evasion"
+                }
                 stat_changes = []
                 
                 meta = m_data.get("meta") or {}
