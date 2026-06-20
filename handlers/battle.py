@@ -68,6 +68,9 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await loading_msg.edit_text(f"⚔️ {challenger.first_name} challenged {target_username} to a 6v6 Random Battle!\n\nBoth players must click the button below to join the arena in my DMs!", reply_markup=reply_markup)
+    
+    # Start initial join timeout
+    reset_timeout(context, battle_id)
 
 async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle_id: str):
     user = update.effective_user
@@ -92,14 +95,15 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
     battle[player_key]["dm_chat_id"] = update.message.chat_id
     
     card_bytes = generate_trainer_card({"_id": user.id, "username": user.first_name}, battle[player_key]["team"])
-    dm_msg = await update.message.reply_photo(photo=card_bytes, caption="Loading arena...")
-    battle[player_key]["dm_msg_id"] = dm_msg.message_id
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
+        dm_msg = await update.message.reply_photo(photo=card_bytes, caption="Entering the arena...")
+        battle[player_key]["dm_msg_id"] = dm_msg.message_id
         reset_timeout(context, battle_id)
         await sync_battle_state(battle_id, context)
     else:
-        await context.bot.edit_message_caption(chat_id=battle[player_key]["dm_chat_id"], message_id=battle[player_key]["dm_msg_id"], caption="⌛ Waiting for your opponent to join...")
+        dm_msg = await update.message.reply_photo(photo=card_bytes, caption="⌛ Waiting for your opponent to join...")
+        battle[player_key]["dm_msg_id"] = dm_msg.message_id
 
 def get_player_buttons(battle, player_key, battle_id):
     opponent_key = "p2" if player_key == "p1" else "p1"
@@ -304,7 +308,16 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             ready = False
             break
 
-    if ready: await resolve_turn(battle_id, context, query)
+    if ready:
+        try:
+            await resolve_turn(battle_id, context, query)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            battle["action_text"] = f"An engine error occurred: {str(e)}. Turn reset to prevent freeze."
+            battle["choices"] = {"p1": None, "p2": None}
+            for pk in ["p1", "p2"]: battle["menus"][pk] = "main"
+            await sync_battle_state(battle_id, context)
     else: await sync_battle_state(battle_id, context)
 
 async def resolve_turn(battle_id, context, query):
