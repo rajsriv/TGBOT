@@ -35,11 +35,12 @@ def generate_trainer_card(user_data, team=None):
     # Draw Title
     draw.text((20, 25), "TRAINER CARD", font=title_font, fill="#f8d868", stroke_width=1, stroke_fill="#4a4a4a")
     
-    # Draw ID
-    draw.text((300, 30), f"IDNo.{user_data.get('_id', '00000')}"[:15], font=text_font, fill="#4a4a4a")
+    # Draw ID (Use last 6 chars of ObjectId)
+    user_id = str(user_data.get('_id', '000000'))
+    draw.text((320, 30), f"IDNo.{user_id[-6:]}", font=text_font, fill="#4a4a4a")
     
-    # Draw Name
-    username = str(user_data.get('username', 'Unknown'))[:15].upper()
+    # Draw Name (Truncate to 12 chars to prevent overflow)
+    username = str(user_data.get('username', 'Unknown'))[:12].upper()
     draw.text((20, 80), f"NAME: {username}", font=title_font, fill="#4a4a4a")
     
     if team:
