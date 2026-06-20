@@ -71,7 +71,8 @@ async def fetch_random_pokemon(level: int = 50):
             "moves": move_data,
             "ability": ability,
             "item": item,
-            "sprite": sprite_bytes
+            "sprite": sprite_bytes,
+            "status": None
         }
 
 def calculate_damage(level, power, attacker_stats, defender_stats, move_class, stab=1.0, type_mod=1.0, crit=1.0):

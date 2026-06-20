@@ -208,12 +208,15 @@ async def update_player_dm(battle_id, context, player_key):
     my_hp_bar = "▓" * my_bars + "░" * (10 - my_bars)
     opp_hp_bar = "▓" * opp_bars + "░" * (10 - opp_bars)
 
+    my_status = f" [{my_active['status'].upper()}]" if my_active.get("status") else ""
+    opp_status = f" [{opp_active['status'].upper()}]" if opp_active.get("status") else ""
+
     text += (
         f"{my_hp_bar} {my_active['hp']}/{my_active['max_hp']} HP\n"
-        f"▛ Your {my_active['name']} (Poké: {me_alive}/6)\n"
+        f"▛ Your {my_active['name']}{my_status} (Poké: {me_alive}/6)\n"
         f"╰ Item: {my_active['item']} | Ability: {my_active['ability']}\n\n"
         f"{opp_hp_bar} {int(opp_hp_pct * 100)}% HP\n"
-        f"▙ Enemy {opp_active['name']} (Poké: {opp_alive}/6)\n\n"
+        f"▙ Enemy {opp_active['name']}{opp_status} (Poké: {opp_alive}/6)\n\n"
     )
     
     thinking = []
@@ -318,7 +321,9 @@ async def resolve_turn(battle_id, context, query):
         def priority(action):
             p, c = action
             if c["type"] == "switch": return 1000000
-            return battle[p]["team"][battle[p]["active"]]["stats"]["spd"] + random.uniform(0, 0.99)
+            spd = battle[p]["team"][battle[p]["active"]]["stats"]["spd"]
+            if battle[p]["team"][battle[p]["active"]].get("status") == "paralyzed": spd *= 0.5
+            return spd + random.uniform(0, 0.99)
         actions.sort(key=priority, reverse=True)
         
         for p_key, choice in actions:
@@ -333,6 +338,25 @@ async def resolve_turn(battle_id, context, query):
             elif choice["type"] == "move":
                 atk_pkmn, def_pkmn = player["team"][player["active"]], opponent["team"][opponent["active"]]
                 move = atk_pkmn["moves"][choice["index"]]
+                
+                # Pre-attack status checks
+                if atk_pkmn.get("status") == "paralyzed" and random.randint(1, 100) <= 25:
+                    action_text += f"⚡ {atk_pkmn['name']} is fully paralyzed and can't move!\n"
+                    continue
+                elif atk_pkmn.get("status") == "frozen":
+                    if random.randint(1, 100) <= 20:
+                        action_text += f"🧊 {atk_pkmn['name']} thawed out!\n"
+                        atk_pkmn["status"] = None
+                    else:
+                        action_text += f"🧊 {atk_pkmn['name']} is frozen solid!\n"
+                        continue
+                elif atk_pkmn.get("status") == "sleep":
+                    if random.randint(1, 100) <= 33:
+                        action_text += f"💤 {atk_pkmn['name']} woke up!\n"
+                        atk_pkmn["status"] = None
+                    else:
+                        action_text += f"💤 {atk_pkmn['name']} is fast asleep.\n"
+                        continue
                 
                 if move["pp"] <= 0:
                     action_text += f"{atk_pkmn['name']} tried to use {move['name']} but has no PP left!\n"
@@ -382,14 +406,17 @@ async def resolve_turn(battle_id, context, query):
                     
                 # Items/Abilities preventing OHKO
                 if dmg >= def_pkmn["hp"] and def_pkmn["hp"] == def_pkmn["max_hp"]:
-                    if def_pkmn["item"] == "Focus Sash":
-                        dmg = def_pkmn["hp"] - 1
+                    if def_pkmn["ability"] == "Sturdy":
+                        dmg = def_pkmn["max_hp"] - 1
+                        action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
+                    elif def_pkmn["item"] == "Focus Sash":
+                        dmg = def_pkmn["max_hp"] - 1
                         def_pkmn["item"] = "None"
                         action_text += f"🎗️ {def_pkmn['name']} hung on using its Focus Sash!\n"
-                    elif def_pkmn["ability"] == "Sturdy":
-                        dmg = def_pkmn["hp"] - 1
-                        action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
                         
+                if atk_pkmn.get("status") == "burned" and move["class"] == "physical":
+                    dmg = max(1, int(dmg * 0.5))
+                
                 # Track actual damage dealt
                 actual_dmg = min(def_pkmn["hp"], dmg)
                 battle[p_key]["damage_dealt"] += actual_dmg
@@ -397,9 +424,24 @@ async def resolve_turn(battle_id, context, query):
                 
                 action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
                 if type_mod > 1.0: action_text += "(It's super effective!) "
-                elif type_mod > 0.0 and type_mod < 1.0: action_text += "(It's not very effective...) "
-                elif type_mod == 0.0: action_text += "(It had no effect!) "
-                action_text += f"(-{dmg} HP)\n"
+                elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
+                elif type_mod == 0: action_text += "(It had no effect...) "
+                action_text += f"(-{actual_dmg} HP)\n"
+                
+                # Secondary Effects
+                if def_pkmn["hp"] > 0 and type_mod > 0 and not def_pkmn.get("status"):
+                    if move["type"] == "fire" and random.randint(1, 100) <= 10:
+                        def_pkmn["status"] = "burned"
+                        action_text += f"🔥 {def_pkmn['name']} was burned!\n"
+                    elif move["type"] == "electric" and random.randint(1, 100) <= 10:
+                        def_pkmn["status"] = "paralyzed"
+                        action_text += f"⚡ {def_pkmn['name']} was paralyzed!\n"
+                    elif move["type"] == "poison" and random.randint(1, 100) <= 30:
+                        def_pkmn["status"] = "poisoned"
+                        action_text += f"☠️ {def_pkmn['name']} was poisoned!\n"
+                    elif move["type"] == "ice" and random.randint(1, 100) <= 10:
+                        def_pkmn["status"] = "frozen"
+                        action_text += f"🧊 {def_pkmn['name']} was frozen solid!\n"
                 
                 # Items (Defender) after damage
                 if def_pkmn["hp"] > 0 and def_pkmn["hp"] <= def_pkmn["max_hp"] / 2 and def_pkmn["item"] == "Sitrus Berry":
@@ -425,6 +467,19 @@ async def resolve_turn(battle_id, context, query):
         # End of turn effects
         for p_key in ["p1", "p2"]:
             active = battle[p_key]["team"][battle[p_key]["active"]]
+            if active["hp"] <= 0: continue
+            
+            if active.get("status") in ["burned", "poisoned"]:
+                dmg = max(1, active["max_hp"] // 8)
+                active["hp"] = max(0, active["hp"] - dmg)
+                if active["hp"] == 0:
+                    if active["status"] == "burned": action_text += f"🔥 {active['name']} fainted from its burn!\n"
+                    else: action_text += f"☠️ {active['name']} fainted from poison!\n"
+                    battle["menus"][p_key] = "force_switch"
+                else:
+                    if active["status"] == "burned": action_text += f"🔥 {active['name']} was hurt by its burn!\n"
+                    else: action_text += f"☠️ {active['name']} was hurt by poison!\n"
+                    
             if active["hp"] > 0 and active["hp"] < active["max_hp"] and active["item"] == "Leftovers":
                 heal = max(1, int(active["max_hp"] / 16))
                 active["hp"] = min(active["max_hp"], active["hp"] + heal)
