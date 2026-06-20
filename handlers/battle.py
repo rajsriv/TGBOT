@@ -197,10 +197,21 @@ async def update_player_dm(battle_id, context, player_key):
     me_alive = sum(1 for p in me["team"] if p["hp"] > 0)
     opp_alive = sum(1 for p in opp["team"] if p["hp"] > 0)
     
+    my_hp_pct = my_active['hp'] / my_active['max_hp']
+    opp_hp_pct = opp_active['hp'] / opp_active['max_hp']
+    
+    my_bars = max(1, int(round(my_hp_pct * 10))) if my_active['hp'] > 0 else 0
+    opp_bars = max(1, int(round(opp_hp_pct * 10))) if opp_active['hp'] > 0 else 0
+    
+    my_hp_bar = "▓" * my_bars + "░" * (10 - my_bars)
+    opp_hp_bar = "▓" * opp_bars + "░" * (10 - opp_bars)
+
     text += (
-        f"▛ Your {my_active['name']}: {my_active['hp']}/{my_active['max_hp']} HP (Poké: {me_alive}/6)\n"
-        f"╰ Item: {my_active['item']} | Ability: {my_active['ability']}\n"
-        f"▙ Enemy {opp_active['name']}: {int(opp_active['hp']/opp_active['max_hp']*100)}% HP (Poké: {opp_alive}/6)\n\n"
+        f"{my_hp_bar} {my_active['hp']}/{my_active['max_hp']} HP\n"
+        f"▛ Your {my_active['name']} (Poké: {me_alive}/6)\n"
+        f"╰ Item: {my_active['item']} | Ability: {my_active['ability']}\n\n"
+        f"{opp_hp_bar} {int(opp_hp_pct * 100)}% HP\n"
+        f"▙ Enemy {opp_active['name']} (Poké: {opp_alive}/6)\n\n"
     )
     
     thinking = []
