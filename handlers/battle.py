@@ -263,6 +263,11 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     battle = active_battles[battle_id]
     if query.from_user.id != battle[player_key]["id"]: return
+    
+    pkmn = battle[player_key]["team"][battle[player_key]["active"]]
+    if "recharging" in pkmn.get("volatile_status", []) or "charging" in pkmn.get("volatile_status", []):
+        await query.answer("Your Pokémon is locked in a move!", show_alert=True)
+        return
 
     if action_type == "menu":
         if action_val == "resign":
@@ -306,6 +311,15 @@ async def resolve_turn(battle_id, context, query):
     battle = active_battles[battle_id]
     is_force_switch = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
     action_text = ""
+    
+    # Auto-lock charging/recharging moves
+    if not is_force_switch:
+        for p_key in ["p1", "p2"]:
+            pkmn = battle[p_key]["team"][battle[p_key]["active"]]
+            if "charging" in pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "move", "index": pkmn.get("charging_move", 0)}
+            elif "recharging" in pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "recharge"}
     
     if is_force_switch:
         for p_key in ["p1", "p2"]:
@@ -378,7 +392,32 @@ async def resolve_turn(battle_id, context, query):
                 if move["pp"] <= 0:
                     action_text += f"{atk_pkmn['name']} tried to use {move['name']} but has no PP left!\n"
                     continue
-                move["pp"] -= 1
+                    
+                # Charging Moves
+                is_charging_move = move["name"].lower() in ["solar beam", "fly", "dig", "dive", "bounce", "skull bash", "razor wind", "sky attack"]
+                if is_charging_move and "charging" not in atk_pkmn.get("volatile_status", []):
+                    atk_pkmn.setdefault("volatile_status", []).append("charging")
+                    atk_pkmn["charging_move"] = choice["index"]
+                    move["pp"] -= 1 # Deduct PP on turn 1
+                    
+                    if move["name"].lower() == "solar beam": action_text += f"☀️ {atk_pkmn['name']} absorbed light!\n"
+                    elif move["name"].lower() in ["fly", "bounce"]:
+                        action_text += f"🦅 {atk_pkmn['name']} flew up high!\n"
+                        atk_pkmn["volatile_status"].append("invulnerable")
+                    elif move["name"].lower() == "dig":
+                        action_text += f"🕳️ {atk_pkmn['name']} burrowed underground!\n"
+                        atk_pkmn["volatile_status"].append("invulnerable")
+                    elif move["name"].lower() == "dive":
+                        action_text += f"🌊 {atk_pkmn['name']} dove underwater!\n"
+                        atk_pkmn["volatile_status"].append("invulnerable")
+                    else:
+                        action_text += f"🔋 {atk_pkmn['name']} is charging its attack!\n"
+                    continue
+                elif is_charging_move:
+                    atk_pkmn["volatile_status"].remove("charging")
+                    if "invulnerable" in atk_pkmn["volatile_status"]: atk_pkmn["volatile_status"].remove("invulnerable")
+                else:
+                    move["pp"] -= 1 # Normal move
                 
                 if move["name"].lower() in ["protect", "detect"]:
                     if "protect" not in atk_pkmn.get("volatile_status", []):
@@ -388,9 +427,12 @@ async def resolve_turn(battle_id, context, query):
                         action_text += f"💥 {atk_pkmn['name']}'s {move['name']} failed!\n"
                     continue
                     
-                # Defender is protecting?
+                # Defender is protecting or invulnerable?
                 if "protect" in def_pkmn.get("volatile_status", []):
                     action_text += f"{atk_pkmn['name']} tried to use {move['name']}, but {def_pkmn['name']} protected itself!\n"
+                    continue
+                if "invulnerable" in def_pkmn.get("volatile_status", []) and move["name"].lower() not in ["earthquake", "magnitude", "surf"]:
+                    action_text += f"{atk_pkmn['name']} used {move['name']}, but it missed because {def_pkmn['name']} is out of reach!\n"
                     continue
                 
                 acc = move.get("accuracy", "-")
@@ -518,6 +560,9 @@ async def resolve_turn(battle_id, context, query):
                             if "flinch" not in def_pkmn.setdefault("volatile_status", []):
                                 def_pkmn["volatile_status"].append("flinch")
                 
+                if move["name"].lower() in ["hyper beam", "giga impact", "frenzy plant", "blast burn", "hydro cannon", "meteor mash"]:
+                    atk_pkmn.setdefault("volatile_status", []).append("recharging")
+                
                 # Items (Defender) after damage
                 if def_pkmn["hp"] > 0 and def_pkmn["hp"] <= def_pkmn["max_hp"] / 2 and def_pkmn["item"] == "Sitrus Berry":
                     heal = int(def_pkmn["max_hp"] / 4)
@@ -536,6 +581,11 @@ async def resolve_turn(battle_id, context, query):
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
                     battle["menus"]["p2" if p_key == "p1" else "p1"] = "force_switch"
+            elif choice["type"] == "recharge":
+                atk_pkmn = player["team"][player["active"]]
+                action_text += f"💤 {atk_pkmn['name']} must recharge!\n"
+                if "recharging" in atk_pkmn.get("volatile_status", []):
+                    atk_pkmn["volatile_status"].remove("recharging")
                     
         battle["choices"] = {"p1": None, "p2": None}
         
