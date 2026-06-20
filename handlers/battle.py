@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from engine import fetch_random_team, calculate_damage
 from utils.type_chart import get_type_multiplier
+from database import db
 import random
 
 active_battles = {}
@@ -53,8 +54,8 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "group_chat_id": msg.chat_id,
         "group_msg_id": msg.message_id,
         "action_text": "",
-        "p1": {"id": challenger.id, "name": challenger.first_name, "tag": challenger.username, "team": p1_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None},
-        "p2": {"id": None, "name": target_username, "tag": target_username.replace("@", ""), "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None},
+        "p1": {"id": challenger.id, "name": challenger.first_name, "tag": challenger.username, "team": p1_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
+        "p2": {"id": None, "name": target_username, "tag": target_username.replace("@", ""), "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "choices": {"p1": None, "p2": None},
         "menus": {"p1": "main", "p2": "main"}
     }
@@ -127,9 +128,34 @@ async def sync_battle_state(battle_id, context):
     p2_alive = sum(1 for p in battle["p2"]["team"] if p["hp"] > 0)
     
     if p1_alive == 0 or p2_alive == 0:
+        p1_won = p2_alive == 0
+        p2_won = p1_alive == 0
+        
         winner = battle["p2"]["name"] if p1_alive == 0 else battle["p1"]["name"]
         loser = battle["p1"]["name"] if p1_alive == 0 else battle["p2"]["name"]
         win_text = f"{battle['action_text']}\n\n🏆 **{winner}** wins the battle!"
+        
+        # Calculate Elo and update DB
+        p1_db = await db.get_user(battle["p1"]["id"])
+        p2_db = await db.get_user(battle["p2"]["id"])
+        
+        elo_text = ""
+        if p1_db and p2_db:
+            p1_elo = p1_db.get("elo", 1000)
+            p2_elo = p2_db.get("elo", 1000)
+            
+            p1_expected = 1 / (1 + 10 ** ((p2_elo - p1_elo) / 400))
+            p2_expected = 1 / (1 + 10 ** ((p1_elo - p2_elo) / 400))
+            
+            k = 32
+            p1_elo_change = int(k * ((1 if p1_won else 0) - p1_expected))
+            p2_elo_change = int(k * ((1 if p2_won else 0) - p2_expected))
+            
+            await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change)
+            await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change)
+            
+            elo_text = f"\n\n📈 {battle['p1']['name']}: {p1_elo_change:+d} Elo\n📉 {battle['p2']['name']}: {p2_elo_change:+d} Elo"
+            win_text += elo_text
         
         for p_key in ["p1", "p2"]:
             if battle[p_key]["dm_chat_id"]:
@@ -137,7 +163,7 @@ async def sync_battle_state(battle_id, context):
                 except Exception: pass
                 
         try:
-            await context.bot.send_message(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], text=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!")
+            await context.bot.send_message(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], text=f"🏆 The battle has concluded!\n{winner} defeated {loser} in a 6v6 Showdown!{elo_text}")
         except Exception: pass
         
         del active_battles[battle_id]
@@ -313,6 +339,9 @@ async def resolve_turn(battle_id, context, query):
                         dmg = def_pkmn["hp"] - 1
                         action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
                         
+                # Track actual damage dealt
+                actual_dmg = min(def_pkmn["hp"], dmg)
+                battle[p_key]["damage_dealt"] += actual_dmg
                 def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
                 
                 action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
