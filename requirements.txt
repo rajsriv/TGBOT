@@ -14,3 +14,4 @@ python-telegram-bot[socks]
 tzlocal
 Pillow
 httpx[socks]
+socksio
