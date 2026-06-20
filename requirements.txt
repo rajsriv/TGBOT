@@ -10,7 +10,7 @@ idna
 motor
 pymongo==4.9.2
 python-dotenv
-python-telegram-bot[socks]
+python-telegram-bot[socks,job-queue]
 tzlocal
 Pillow
 httpx[socks]
