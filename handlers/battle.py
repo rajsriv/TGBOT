@@ -114,7 +114,9 @@ def get_player_buttons(battle, player_key, battle_id):
         row1 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
         row2 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:], start=2)]
         switch_btn = [InlineKeyboardButton(f"Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
-        buttons.extend([row1, row2, switch_btn])
+        if row1: buttons.append(row1)
+        if row2: buttons.append(row2)
+        buttons.append(switch_btn)
     elif menu in ["switch", "force_switch"]:
         for i, pkmn in enumerate(p_data["team"]):
             if i != p_data["active"] and pkmn["hp"] > 0:
