@@ -217,7 +217,9 @@ async def update_player_dm(battle_id, context, player_key):
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
     
     try: await context.bot.edit_message_caption(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], caption=text, reply_markup=reply_markup)
-    except Exception: pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to edit dm message: {e}")
 
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
