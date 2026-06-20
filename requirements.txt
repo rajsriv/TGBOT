@@ -13,3 +13,4 @@ python-dotenv==1.2.2
 python-telegram-bot==22.8
 tzlocal==5.4.3
 Pillow==10.3.0
+httpx[socks]==0.28.1

@@ -17,8 +17,14 @@ def main():
         logger.error("Please set your BOT_TOKEN in the .env file!")
         return
 
+    import os
+    proxy_url = os.environ.get("BOT_PROXY_URL")
+    
     # Create the Application and pass it your bot's token.
-    application = Application.builder().token(config.BOT_TOKEN).build()
+    builder = Application.builder().token(config.BOT_TOKEN)
+    if proxy_url:
+        builder = builder.proxy_url(proxy_url).get_updates_proxy_url(proxy_url)
+    application = builder.build()
 
     # on different commands - answer in Telegram
     application.add_handler(CommandHandler("start", start_command))
