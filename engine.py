@@ -3,8 +3,8 @@ import random
 import asyncio
 from utils.formulas import calc_stat, roll_ivs
 
-async def fetch_random_team(size=6, level=50):
-    tasks = [fetch_random_pokemon(level) for _ in range(size)]
+async def fetch_random_team(size=6, level=None):
+    tasks = [fetch_random_pokemon(level if level is not None else random.randint(80, 99)) for _ in range(size)]
     return await asyncio.gather(*tasks)
 
 async def fetch_random_pokemon(level: int = 50):
