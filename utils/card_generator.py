@@ -40,7 +40,8 @@ def generate_trainer_card(user_data, team=None):
     draw.text((WIDTH - 250, HEIGHT - 40), f"IDNo.{user_id}", font=text_font, fill="#4a4a4a")
     
     # Draw Name (Truncate to 12 chars to prevent overflow)
-    username = str(user_data.get('username', 'Unknown'))[:12].upper()
+    name_str = user_data.get('first_name') or user_data.get('username', 'Unknown')
+    username = str(name_str)[:12].upper()
     draw.text((20, 80), f"NAME: {username}", font=title_font, fill="#4a4a4a")
     
     if team:
