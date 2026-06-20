@@ -32,6 +32,28 @@ async def battle_timeout_job(context: ContextTypes.DEFAULT_TYPE):
 
     del active_battles[battle_id]
 
+async def auto_resolve_job(context: ContextTypes.DEFAULT_TYPE):
+    battle_id = context.job.data
+    if battle_id not in active_battles: return
+    battle = active_battles[battle_id]
+    if battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch": return
+    
+    for p_key in ["p1", "p2"]:
+        pkmn = battle[p_key]["team"][battle[p_key]["active"]]
+        if "charging" in pkmn.get("volatile_status", []):
+            battle["choices"][p_key] = {"type": "move", "index": pkmn.get("charging_move", 0)}
+        elif "recharging" in pkmn.get("volatile_status", []):
+            battle["choices"][p_key] = {"type": "recharge"}
+            
+    try: await resolve_turn(battle_id, context, None)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        battle["action_text"] = f"An engine error occurred during auto-resolve: {str(e)}. Turn reset."
+        battle["choices"] = {"p1": None, "p2": None}
+        for pk in ["p1", "p2"]: battle["menus"][pk] = "main"
+        await sync_battle_state(battle_id, context)
+
 def reset_timeout(context, battle_id):
     current_jobs = context.job_queue.get_jobs_by_name(f"timeout_{battle_id}")
     for job in current_jobs: job.schedule_removal()
@@ -300,6 +322,15 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     battle["choices"][player_key] = {"type": action_type, "index": int(action_val)}
     await query.answer("Locked in!")
 
+    # Auto-set choices for locked players BEFORE checking if ready!
+    for p_key in ["p1", "p2"]:
+        if battle["choices"][p_key] is None:
+            active_pkmn = battle[p_key]["team"][battle[p_key]["active"]]
+            if "charging" in active_pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "move", "index": active_pkmn.get("charging_move", 0)}
+            elif "recharging" in active_pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "recharge"}
+
     ready = True
     for p_key in ["p1", "p2"]:
         opponent_key = "p2" if p_key == "p1" else "p1"
@@ -324,15 +355,6 @@ async def resolve_turn(battle_id, context, query):
     battle = active_battles[battle_id]
     is_force_switch = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
     action_text = ""
-    
-    # Auto-lock charging/recharging moves
-    if not is_force_switch:
-        for p_key in ["p1", "p2"]:
-            pkmn = battle[p_key]["team"][battle[p_key]["active"]]
-            if "charging" in pkmn.get("volatile_status", []):
-                battle["choices"][p_key] = {"type": "move", "index": pkmn.get("charging_move", 0)}
-            elif "recharging" in pkmn.get("volatile_status", []):
-                battle["choices"][p_key] = {"type": "recharge"}
     
     if is_force_switch:
         for p_key in ["p1", "p2"]:
@@ -633,3 +655,11 @@ async def resolve_turn(battle_id, context, query):
     reset_timeout(context, battle_id)
     battle["action_text"] = action_text
     await sync_battle_state(battle_id, context)
+    
+    # Check if both players are locked into next turn!
+    is_fs = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
+    if not is_fs:
+        p1_locked = "charging" in battle["p1"]["team"][battle["p1"]["active"]].get("volatile_status", []) or "recharging" in battle["p1"]["team"][battle["p1"]["active"]].get("volatile_status", [])
+        p2_locked = "charging" in battle["p2"]["team"][battle["p2"]["active"]].get("volatile_status", []) or "recharging" in battle["p2"]["team"][battle["p2"]["active"]].get("volatile_status", [])
+        if p1_locked and p2_locked:
+            context.job_queue.run_once(auto_resolve_job, 2.5, data=battle_id)
