@@ -5,23 +5,9 @@ from database import db
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # Try getting user from args if they tagged someone
-    target_username = None
-    if context.args:
-        target_username = context.args[0].replace("@", "")
-    elif update.message.reply_to_message:
-        target_username = update.message.reply_to_message.from_user.username
-        
-    if target_username:
-        # Search db by username
-        user = await db.users.find_one({"username": target_username})
-        if not user:
-            await update.message.reply_text(f"Could not find a trainer named @{target_username}.")
-            return
-    else:
-        user = await db.get_user(user_id)
-        if not user:
-            user = await db.create_user(user_id, update.effective_user.username or update.effective_user.first_name)
+    user = await db.get_user(user_id)
+    if not user:
+        user = await db.create_user(user_id, update.effective_user.username or update.effective_user.first_name)
             
     stats = f"👤 **Trainer Profile: {user.get('username', 'Unknown')}**\n\n"
     stats += f"🏆 Elo Rating: {user.get('elo', 1000)}\n"
