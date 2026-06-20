@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from database import db
+from utils.card_generator import generate_trainer_card
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -9,15 +10,13 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         user = await db.create_user(user_id, update.effective_user.username or update.effective_user.first_name)
             
-    stats = f"👤 **Trainer Profile: {user.get('username', 'Unknown')}**\n\n"
-    stats += f"🏆 Elo Rating: {user.get('elo', 1000)}\n"
-    stats += f"⚔️ Battles Played: {user.get('battles_played', 0)}\n"
-    stats += f"✅ Wins: {user.get('wins', 0)} | ❌ Losses: {user.get('losses', 0)}\n"
-    stats += f"💥 Total Damage Dealt: {user.get('total_damage', 0)}\n"
+    # Generate the custom trainer card image
+    card_bytes = generate_trainer_card(user)
     
+    # Calculate win rate for caption
     total = user.get('battles_played', 0)
-    if total > 0:
-        winrate = (user.get('wins', 0) / total) * 100
-        stats += f"📊 Win Rate: {winrate:.1f}%\n"
-        
-    await update.message.reply_text(stats)
+    winrate = (user.get('wins', 0) / total * 100) if total > 0 else 0
+    
+    caption = f"📊 Win Rate: {winrate:.1f}%\n"
+    
+    await update.message.reply_photo(photo=card_bytes, caption=caption)
