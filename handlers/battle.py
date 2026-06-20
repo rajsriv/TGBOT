@@ -360,7 +360,15 @@ async def resolve_turn(battle_id, context, query):
                     elif atk_pkmn["ability"] == "Torrent" and move["type"] == "water": stab *= 1.5
                     elif atk_pkmn["ability"] == "Swarm" and move["type"] == "bug": stab *= 1.5
                 
-                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=stab, type_mod=type_mod)
+                is_crit = False
+                if random.randint(1, 100) <= 6: # ~6.25% standard gen crit chance
+                    is_crit = True
+                crit_mod = 1.5 if is_crit else 1.0
+                
+                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_pkmn["stats"], def_pkmn["stats"], move["class"], stab=stab, type_mod=type_mod, crit=crit_mod)
+                
+                if is_crit:
+                    action_text += "A critical hit! "
                 
                 # Items (Attacker)
                 if atk_pkmn["item"] == "Expert Belt" and type_mod > 1.0:
