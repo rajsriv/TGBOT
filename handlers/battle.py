@@ -111,12 +111,14 @@ def get_player_buttons(battle, player_key, battle_id):
     
     if menu == "main":
         active_pkmn = p_data["team"][p_data["active"]]
-        row1 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][:2])]
-        row2 = [InlineKeyboardButton(f"{m['name']} (Pow: {m['power']} | PP: {m['pp']}/{m['max_pp']})", callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i, m in enumerate(active_pkmn['moves'][2:], start=2)]
+        row1 = [InlineKeyboardButton(str(i+1), callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i in range(min(2, len(active_pkmn['moves'])))]
+        row2 = [InlineKeyboardButton(str(i+1), callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i in range(2, len(active_pkmn['moves']))]
         switch_btn = [InlineKeyboardButton(f"Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
+        resign_btn = [InlineKeyboardButton(f"🏳️ Resign", callback_data=f"btn_{battle_id}_{player_key}_menu_resign")]
         if row1: buttons.append(row1)
         if row2: buttons.append(row2)
         buttons.append(switch_btn)
+        buttons.append(resign_btn)
     elif menu in ["switch", "force_switch"]:
         for i, pkmn in enumerate(p_data["team"]):
             if i != p_data["active"] and pkmn["hp"] > 0:
@@ -221,6 +223,12 @@ async def update_player_dm(battle_id, context, player_key):
         if battle["choices"][player_key] is None and len(get_player_buttons(battle, player_key, battle_id)) > 0: thinking.append(me["name"])
         if battle["choices"][opponent_key] is None and len(get_player_buttons(battle, opponent_key, battle_id)) > 0: thinking.append(opp["name"])
         
+    if battle["choices"][player_key] is None and battle["menus"][player_key] == "main":
+        for i, m in enumerate(my_active["moves"]):
+            acc = m.get("accuracy", "-")
+            text += f"{i+1}. {m['name']} ({m['power']}/{acc} | {m['pp']}/{m['max_pp']})\n"
+        text += "\n"
+        
     if len(thinking) == 2: text += f"■ Both players making choices..."
     elif len(thinking) == 1: text += f"Waiting for {thinking[0]}..."
     
@@ -253,6 +261,14 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.from_user.id != battle[player_key]["id"]: return
 
     if action_type == "menu":
+        if action_val == "resign":
+            for pkmn in battle[player_key]["team"]:
+                pkmn["hp"] = 0
+            battle["action_text"] = f"{battle[player_key]['name']} forfeited the match!"
+            await sync_battle_state(battle_id, context)
+            await query.answer("You resigned.")
+            return
+            
         battle["menus"][player_key] = action_val
         await sync_battle_state(battle_id, context)
         await query.answer()
