@@ -144,27 +144,27 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                             img.paste(sprite_img, (x + 3, y + 3), sprite_img)
                         except Exception as e:
                             pass
-        else:
-            # Draw a big Pokeball in the empty space on the left
-            pb_x = 55
-            pb_y = 125
-            pb_size = 130
-            
-            draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
-            draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
-            
-            band_y = pb_y + (pb_size // 2) - 4
-            draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
-            
-            btn_size = 36
-            btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
-            btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
-            draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
-            
-            ibtn_size = 20
-            ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
-            ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
-            draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
+            else:
+                # Draw a big Pokeball in the empty space on the left
+                pb_x = 55
+                pb_y = 125
+                pb_size = 130
+                
+                draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+                draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
+                
+                band_y = pb_y + (pb_size // 2) - 4
+                draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
+                
+                btn_size = 36
+                btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
+                btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
+                draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
+                
+                ibtn_size = 20
+                ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
+                ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
+                draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
     else:
         # VS Layout (BATTLE / RESULT)
         box_w, box_h = 56, 56
