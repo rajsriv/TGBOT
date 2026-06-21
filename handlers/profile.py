@@ -14,11 +14,4 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user['first_name'] = update.effective_user.first_name
     card_bytes = generate_trainer_card(user)
     
-    # Calculate win rate for caption
-    total = user.get('battles_played', 0)
-    winrate = (user.get('wins', 0) / total * 100) if total > 0 else 0
-    
-    username = user.get('username', 'Trainer')
-    caption = f"👤 **Trainer:** @{username}\n📊 **Win Rate:** {winrate:.1f}%\n"
-    
-    await update.message.reply_photo(photo=card_bytes, caption=caption, parse_mode="Markdown")
+    await update.message.reply_photo(photo=card_bytes)
