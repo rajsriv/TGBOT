@@ -1274,6 +1274,10 @@ async def resolve_turn(battle_id, context, query):
                     else:
                         action_text += f"🛢️ {active['name']} was hurt by Black Sludge!\n"
         
+    for p_key in ["p1", "p2"]:
+        if battle["menus"][p_key] != "force_switch":
+            battle["menus"][p_key] = "main"
+            
     # Auto-lock choices for charging/recharging
     is_fs = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
     if not is_fs:
