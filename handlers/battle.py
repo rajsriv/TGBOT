@@ -431,15 +431,6 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     battle["choices"][player_key] = {"type": action_type, "index": int(action_val)}
     await query.answer("Locked in!")
 
-    # Auto-set choices for locked players BEFORE checking if ready!
-    for p_key in ["p1", "p2"]:
-        if battle["choices"][p_key] is None:
-            active_pkmn = battle[p_key]["team"][battle[p_key]["active"]]
-            if "charging" in active_pkmn.get("volatile_status", []):
-                battle["choices"][p_key] = {"type": "move", "index": active_pkmn.get("charging_move", 0)}
-            elif "recharging" in active_pkmn.get("volatile_status", []):
-                battle["choices"][p_key] = {"type": "recharge"}
-
     ready = True
     for p_key in ["p1", "p2"]:
         opponent_key = "p2" if p_key == "p1" else "p1"
@@ -1283,14 +1274,20 @@ async def resolve_turn(battle_id, context, query):
                     else:
                         action_text += f"🛢️ {active['name']} was hurt by Black Sludge!\n"
         
+    # Auto-lock choices for charging/recharging
+    is_fs = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
+    if not is_fs:
+        for p_key in ["p1", "p2"]:
+            pkmn = battle[p_key]["team"][battle[p_key]["active"]]
+            if "charging" in pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "move", "index": pkmn.get("charging_move", 0)}
+            elif "recharging" in pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "recharge"}
+                
     reset_timeout(context, battle_id)
     battle["action_text"] = action_text
     await sync_battle_state(battle_id, context)
     
     # Check if both players are locked into next turn!
-    is_fs = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
-    if not is_fs:
-        p1_locked = "charging" in battle["p1"]["team"][battle["p1"]["active"]].get("volatile_status", []) or "recharging" in battle["p1"]["team"][battle["p1"]["active"]].get("volatile_status", [])
-        p2_locked = "charging" in battle["p2"]["team"][battle["p2"]["active"]].get("volatile_status", []) or "recharging" in battle["p2"]["team"][battle["p2"]["active"]].get("volatile_status", [])
-        if p1_locked and p2_locked:
-            context.job_queue.run_once(auto_resolve_job, 2.5, data=battle_id)
+    if not is_fs and battle["choices"]["p1"] is not None and battle["choices"]["p2"] is not None:
+        context.job_queue.run_once(auto_resolve_job, 2.5, data=battle_id)
