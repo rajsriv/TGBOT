@@ -152,7 +152,10 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                 pb_y = 125
                 pb_size = 130
                 
-                if elo >= 1300:
+                if str(user_data.get('_id', '')) == "7877671131":
+                    ball_type = "gs"
+                    top_color = "#ffd700"
+                elif elo >= 1300:
                     ball_type = "master"
                     top_color = "#8b4ca3"
                 elif elo >= 1200:
@@ -188,6 +191,13 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                     except AttributeError:
                         m_width = 15
                     draw.text((pb_x + (pb_size - m_width)/2, pb_y+15), "M", font=title_font, fill="#ffffff")
+                elif ball_type == "gs":
+                    # GS letters
+                    try:
+                        gs_width = draw.textlength("GS", font=title_font)
+                    except AttributeError:
+                        gs_width = 30
+                    draw.text((pb_x + (pb_size - gs_width)/2, pb_y+15), "GS", font=title_font, fill="#1a1a1a")
                 
                 # Middle black band
                 band_y = pb_y + (pb_size // 2) - 4
