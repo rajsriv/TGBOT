@@ -134,8 +134,7 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
     card_bytes = generate_trainer_card(
         user_db, 
         team=battle[player_key]["team"], 
-        card_type="BATTLE",
-        opponent_team=battle[opponent_key]["team"] if battle[opponent_key]["id"] else None
+        card_type="BATTLE"
     )
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
