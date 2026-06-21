@@ -636,7 +636,18 @@ async def resolve_turn(battle_id, context, query):
                     atk_stats["sp_atk"] = int(atk_stats["sp_atk"] * get_stat_multiplier(atk_stage))
                     def_stats["sp_def"] = int(def_stats["sp_def"] * get_stat_multiplier(def_stage))
                 
-                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod)
+                weather_mod = 1.0
+                if battle.get("weather") == "rain":
+                    if move["type"] == "water": weather_mod = 1.5
+                    elif move["type"] == "fire": weather_mod = 0.5
+                elif battle.get("weather") == "sun":
+                    if move["type"] == "fire": weather_mod = 1.5
+                    elif move["type"] == "water": weather_mod = 0.5
+                    
+                if battle.get("weather") == "sandstorm" and "rock" in def_pkmn["types"]:
+                    def_stats["sp_def"] = int(def_stats["sp_def"] * 1.5)
+                
+                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod, weather_mod=weather_mod)
                 
                 if is_crit and move["power"] > 0:
                     action_text += "A critical hit! "
@@ -678,6 +689,23 @@ async def resolve_turn(battle_id, context, query):
                     action_text += f"(-{actual_dmg} HP)\n"
                 else:
                     action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\n"
+                    m_name = move["name"].lower()
+                    if m_name == "rain dance":
+                        battle["weather"] = "rain"
+                        battle["weather_turns"] = 5
+                        action_text += "🌧️ It started to rain!\n"
+                    elif m_name == "sunny day":
+                        battle["weather"] = "sun"
+                        battle["weather_turns"] = 5
+                        action_text += "☀️ The sunlight turned harsh!\n"
+                    elif m_name == "sandstorm":
+                        battle["weather"] = "sandstorm"
+                        battle["weather_turns"] = 5
+                        action_text += "🌪️ A sandstorm kicked up!\n"
+                    elif m_name == "hail":
+                        battle["weather"] = "hail"
+                        battle["weather_turns"] = 5
+                        action_text += "🌨️ It started to hail!\n"
                 
                 # Apply Stat Changes
                 for sc in move.get("stat_changes", []):
@@ -754,6 +782,13 @@ async def resolve_turn(battle_id, context, query):
         battle["choices"] = {"p1": None, "p2": None}
         
         # End of turn effects
+        if battle.get("weather"):
+            battle["weather_turns"] -= 1
+            if battle["weather_turns"] <= 0:
+                w_msg = {"rain": "The rain stopped.", "sun": "The sunlight faded.", "sandstorm": "The sandstorm subsided.", "hail": "The hail stopped."}
+                action_text += f"☁️ {w_msg.get(battle['weather'])}\n"
+                battle["weather"] = None
+                
         if battle.get("trick_room", 0) > 0:
             battle["trick_room"] -= 1
             if battle["trick_room"] == 0:
@@ -768,6 +803,31 @@ async def resolve_turn(battle_id, context, query):
             if "flinch" in active.get("volatile_status", []):
                 active["volatile_status"].remove("flinch")
                 
+            if active["hp"] <= 0: continue
+            
+            # Weather damage
+            if battle.get("weather") == "sandstorm" and not any(t in active["types"] for t in ["rock", "ground", "steel"]):
+                if active["ability"] not in ["Sand Veil", "Sand Rush", "Sand Force", "Overcoat"]:
+                    dmg = max(1, active["max_hp"] // 16)
+                    active["hp"] = max(0, active["hp"] - dmg)
+                    if active["hp"] == 0:
+                        action_text += f"🌪️ {active['name']} was buffeted by the sandstorm and fainted!\n"
+                        battle["menus"][p_key] = "force_switch"
+                    else:
+                        action_text += f"🌪️ {active['name']} is buffeted by the sandstorm!\n"
+
+            if active["hp"] <= 0: continue
+
+            if battle.get("weather") == "hail" and "ice" not in active["types"]:
+                if active["ability"] not in ["Snow Cloak", "Ice Body", "Overcoat"]:
+                    dmg = max(1, active["max_hp"] // 16)
+                    active["hp"] = max(0, active["hp"] - dmg)
+                    if active["hp"] == 0:
+                        action_text += f"🌨️ {active['name']} was pelted by hail and fainted!\n"
+                        battle["menus"][p_key] = "force_switch"
+                    else:
+                        action_text += f"🌨️ {active['name']} is pelted by hail!\n"
+
             if active["hp"] <= 0: continue
             
             if active.get("status") in ["burned", "poisoned"]:
