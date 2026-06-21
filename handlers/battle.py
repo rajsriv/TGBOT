@@ -509,6 +509,13 @@ async def resolve_turn(battle_id, context, query):
         for p_key in ["p1", "p2"]:
             if battle["menus"][p_key] == "force_switch" and battle["choices"][p_key]:
                 choice = battle["choices"][p_key]
+                
+                old_pkmn = battle[p_key]["team"][battle[p_key]["active"]]
+                old_pkmn["stat_stages"] = {}
+                old_pkmn["volatile_status"] = []
+                old_pkmn["protect_counter"] = 0
+                if "choice_locked" in old_pkmn: del old_pkmn["choice_locked"]
+                
                 battle[p_key]["active"] = choice["index"]
                 pkmn = battle[p_key]["team"][choice["index"]]
                 action_text += f"🔄 {battle[p_key]['name']} sent out {pkmn['name']}!\n"
@@ -570,6 +577,9 @@ async def resolve_turn(battle_id, context, query):
             if choice["type"] == "switch":
                 old_pkmn = player["team"][player["active"]]
                 old_pkmn["toxic_turns"] = 1
+                old_pkmn["stat_stages"] = {}
+                old_pkmn["volatile_status"] = []
+                old_pkmn["protect_counter"] = 0
                 if "choice_locked" in old_pkmn: del old_pkmn["choice_locked"]
                 
                 player["active"] = choice["index"]
@@ -1074,6 +1084,8 @@ async def resolve_turn(battle_id, context, query):
                                 def_pkmn["toxic_turns"] = 1
                                 if "choice_locked" in def_pkmn: del def_pkmn["choice_locked"]
                                 def_pkmn["volatile_status"] = [] # Clear volatile status
+                                def_pkmn["stat_stages"] = {}
+                                def_pkmn["protect_counter"] = 0
                                 
                                 action_text += f"🌪️ {old_name} was blown away! {new_pkmn['name']} was dragged out!\n"
                                 
