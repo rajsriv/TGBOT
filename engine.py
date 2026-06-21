@@ -16,7 +16,7 @@ async def fetch_random_team(size=6, level=None):
     return await asyncio.gather(*tasks)
 
 async def fetch_random_pokemon(level: int = None):
-    pokemon_id = random.randint(1, 151) # Gen 1 to keep it fast and classic
+    pokemon_id = random.randint(1, 493) # Gen 1 to Gen 4 (Sinnoh)
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"https://pokeapi.co/api/v2/pokemon/{pokemon_id}")
         data = resp.json()
