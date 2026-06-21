@@ -42,7 +42,8 @@ def generate_trainer_card(user_data, team=None):
     
     # Draw ID (Bottom corner)
     user_id = str(user_data.get('_id', '000000'))
-    draw.text((WIDTH - 150, HEIGHT - 30), f"IDNo.{user_id}", font=small_font, fill=TEXT_BLACK)
+    # Use a wider margin from the right edge to prevent overflow
+    draw.text((WIDTH - 200, HEIGHT - 30), f"IDNo.{user_id}", font=small_font, fill=TEXT_BLACK)
     
     # Draw Name (Truncate to 12 chars to prevent overflow)
     name_str = user_data.get('first_name') or user_data.get('username', 'Unknown')
@@ -97,7 +98,33 @@ def generate_trainer_card(user_data, team=None):
                     img.paste(sprite_img, (x + 3, y + 3), sprite_img)
                 except Exception as e:
                     pass
-    
+    else:
+        # Draw a big Pokeball in the empty space on the left
+        pb_x = 55
+        pb_y = 125
+        pb_size = 130
+        
+        # Base white circle with black outline
+        draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+        
+        # Top red half (chord)
+        draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
+        
+        # Middle black band
+        band_y = pb_y + (pb_size // 2) - 4
+        draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
+        
+        # Center button (outer black circle)
+        btn_size = 36
+        btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
+        btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
+        draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
+        
+        # Center button (inner white circle)
+        ibtn_size = 20
+        ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
+        ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
+        draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
     # Save to bytes
     bio = io.BytesIO()
     img.save(bio, format="PNG")
