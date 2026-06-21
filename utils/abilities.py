@@ -132,4 +132,9 @@ ABILITY_REGISTRY = {
     "Flame Body": {"on_hit_receive": flame_body_on_hit_receive},
     "Poison Point": {"on_hit_receive": poison_point_on_hit_receive},
     "Effect Spore": {"on_hit_receive": effect_spore_on_hit_receive},
+    
+    "Electric Surge": {"on_switch_in": lambda battle, **kwargs: "⚡ An electric current runs across the battlefield!\n" if not battle.update({"terrain": "electric", "terrain_turns": 5}) else ""},
+    "Grassy Surge": {"on_switch_in": lambda battle, **kwargs: "🌿 Grass grew to cover the battlefield!\n" if not battle.update({"terrain": "grassy", "terrain_turns": 5}) else ""},
+    "Misty Surge": {"on_switch_in": lambda battle, **kwargs: "🌫️ Mist swirled around the battlefield!\n" if not battle.update({"terrain": "misty", "terrain_turns": 5}) else ""},
+    "Psychic Surge": {"on_switch_in": lambda battle, **kwargs: "🔮 The battlefield got weird!\n" if not battle.update({"terrain": "psychic", "terrain_turns": 5}) else ""},
 }

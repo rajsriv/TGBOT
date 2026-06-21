@@ -96,7 +96,9 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "hazards": {
             "p1": {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False},
             "p2": {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False}
-        }
+        },
+        "terrain": None,
+        "terrain_turns": 0
     }
 
     bot_username = context.bot.username
@@ -461,7 +463,7 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 def apply_hazards(battle, p_key, pkmn):
     hazards = battle["hazards"][p_key]
     text = ""
-    is_grounded = "flying" not in pkmn["types"] and pkmn["ability"] != "Levitate"
+    grounded = is_grounded(pkmn)
     
     if hazards["stealth_rock"]:
         from engine import get_type_multiplier
@@ -472,7 +474,7 @@ def apply_hazards(battle, p_key, pkmn):
         
     if pkmn["hp"] <= 0: return text
         
-    if is_grounded:
+    if grounded:
         if hazards["spikes"] > 0:
             dmg_frac = [8, 6, 4][hazards["spikes"] - 1]
             dmg = max(1, int(pkmn["max_hp"] / dmg_frac))
@@ -573,6 +575,12 @@ async def resolve_turn(battle_id, context, query):
             elif choice["type"] == "move":
                 atk_pkmn, def_pkmn = player["team"][player["active"]], opponent["team"][opponent["active"]]
                 move = atk_pkmn["moves"][choice["index"]]
+                
+                # Psychic Terrain Priority Check
+                is_priority = move["name"].lower() in ["fake out", "extreme speed", "quick attack", "mach punch", "bullet punch", "ice shard", "aqua jet", "sucker punch", "vacuum wave", "shadow sneak"]
+                if is_priority and battle.get("terrain") == "psychic" and is_grounded(def_pkmn):
+                    action_text += f"{atk_pkmn['name']} cannot use {move['name']} because of Psychic Terrain!\n"
+                    continue
                 
                 # Pre-attack status checks
                 if "confused" in atk_pkmn.get("volatile_status", []):
@@ -758,8 +766,17 @@ async def resolve_turn(battle_id, context, query):
                     
                 if battle.get("weather") == "sandstorm" and "rock" in def_pkmn["types"]:
                     def_stats["sp_def"] = int(def_stats["sp_def"] * 1.5)
+                    
+                terrain_mod = 1.0
+                if battle.get("terrain") == "electric" and move["type"] == "electric" and is_grounded(atk_pkmn): terrain_mod = 1.3
+                elif battle.get("terrain") == "grassy" and move["type"] == "grass" and is_grounded(atk_pkmn): terrain_mod = 1.3
+                elif battle.get("terrain") == "psychic" and move["type"] == "psychic" and is_grounded(atk_pkmn): terrain_mod = 1.3
+                
+                if battle.get("terrain") == "misty" and move["type"] == "dragon" and is_grounded(def_pkmn): terrain_mod = 0.5
+                elif battle.get("terrain") == "grassy" and move["name"].lower() in ["earthquake", "magnitude", "bulldoze"] and is_grounded(def_pkmn): terrain_mod = 0.5
                 
                 dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod, weather_mod=weather_mod)
+                dmg = int(dmg * terrain_mod)
                 
                 if is_crit and move["power"] > 0:
                     action_text += "A critical hit! "
@@ -834,51 +851,71 @@ async def resolve_turn(battle_id, context, query):
                     action_text += f"(-{total_actual_dmg} HP)\n"
                     
                     actual_dmg = total_actual_dmg
+                    if actual_dmg > 0 and not hit_substitute:
+                        hit_msg = execute_ability_hook("on_hit_receive", def_pkmn["ability"], move=move, atk_pkmn=atk_pkmn)
+                        if hit_msg: action_text += hit_msg
                         
-                        if actual_dmg > 0 and not hit_substitute:
-                            hit_msg = execute_ability_hook("on_hit_receive", def_pkmn["ability"], move=move, atk_pkmn=atk_pkmn)
-                            if hit_msg: action_text += hit_msg
-                            
-                            # Draining Moves
-                            draining_moves = ["giga drain", "drain punch", "horn leech", "absorb", "mega drain", "leech life", "oblivion wing", "parabolic charge"]
-                            if move["name"].lower() in draining_moves:
-                                if def_pkmn["ability"] == "Liquid Ooze":
-                                    ooze_dmg = max(1, actual_dmg // 2)
-                                    atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - ooze_dmg)
-                                    action_text += f"💧 {atk_pkmn['name']} sucked up the liquid ooze and was hurt! (-{ooze_dmg} HP)\n"
-                                else:
-                                    heal = max(1, actual_dmg // 2)
-                                    if atk_pkmn["hp"] < atk_pkmn["max_hp"]:
-                                        atk_pkmn["hp"] = min(atk_pkmn["max_hp"], atk_pkmn["hp"] + heal)
-                                        action_text += f"🌿 {atk_pkmn['name']} had its HP restored! (+{heal} HP)\n"
-                                        
-                            # Recoil Moves
-                            recoil_moves_33 = ["flare blitz", "double-edge", "brave bird", "wood hammer", "wild charge", "volt tackle"]
-                            recoil_moves_25 = ["take down", "submission"]
-                            recoil_moves_50 = ["head smash", "light of ruin"]
-                            
-                            m_name = move["name"].lower()
-                            recoil_frac = 0
-                            if m_name in recoil_moves_33: recoil_frac = 1/3
-                            elif m_name in recoil_moves_25: recoil_frac = 1/4
-                            elif m_name in recoil_moves_50: recoil_frac = 1/2
-                            
-                            if recoil_frac > 0:
-                                if atk_pkmn["ability"] != "Rock Head":
-                                    recoil_dmg = max(1, int(actual_dmg * recoil_frac))
-                                    atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - recoil_dmg)
-                                    action_text += f"💥 {atk_pkmn['name']} was damaged by the recoil! (-{recoil_dmg} HP)\n"
+                        # Draining Moves
+                        draining_moves = ["giga drain", "drain punch", "horn leech", "absorb", "mega drain", "leech life", "oblivion wing", "parabolic charge"]
+                        if move["name"].lower() in draining_moves:
+                            if def_pkmn["ability"] == "Liquid Ooze":
+                                ooze_dmg = max(1, actual_dmg // 2)
+                                atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - ooze_dmg)
+                                action_text += f"💧 {atk_pkmn['name']} sucked up the liquid ooze and was hurt! (-{ooze_dmg} HP)\n"
+                            else:
+                                heal = max(1, actual_dmg // 2)
+                                if atk_pkmn["hp"] < atk_pkmn["max_hp"]:
+                                    atk_pkmn["hp"] = min(atk_pkmn["max_hp"], atk_pkmn["hp"] + heal)
+                                    action_text += f"🌿 {atk_pkmn['name']} had its HP restored! (+{heal} HP)\n"
+                                    
+                        # Recoil Moves
+                        recoil_moves_33 = ["flare blitz", "double-edge", "brave bird", "wood hammer", "wild charge", "volt tackle"]
+                        recoil_moves_25 = ["take down", "submission"]
+                        recoil_moves_50 = ["head smash", "light of ruin"]
+                        
+                        m_name = move["name"].lower()
+                        recoil_frac = 0
+                        if m_name in recoil_moves_33: recoil_frac = 1/3
+                        elif m_name in recoil_moves_25: recoil_frac = 1/4
+                        elif m_name in recoil_moves_50: recoil_frac = 1/2
+                        
+                        if recoil_frac > 0:
+                            if atk_pkmn["ability"] != "Rock Head":
+                                recoil_dmg = max(1, int(actual_dmg * recoil_frac))
+                                atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - recoil_dmg)
+                                action_text += f"💥 {atk_pkmn['name']} was damaged by the recoil! (-{recoil_dmg} HP)\n"
                 
                 if move["power"] == 0:
                     m_name = move["name"].lower()
                     
+                    def can_status(pkmn, status_type):
+                        if battle.get("terrain") == "misty" and is_grounded(pkmn): return False
+                        if battle.get("terrain") == "electric" and is_grounded(pkmn) and status_type == "sleep": return False
+                        return True
+                        
                     if "substitute" in def_pkmn.get("volatile_status", []) and move.get("target") in ["selected-pokemon", "all-opponents"]:
                         action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\nBut it failed against the substitute!\n"
                         continue
                         
                     action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\n"
                     
-                    if m_name == "substitute":
+                    if m_name == "electric terrain":
+                        battle["terrain"] = "electric"
+                        battle["terrain_turns"] = 5
+                        action_text += "⚡ An electric current runs across the battlefield!\n"
+                    elif m_name == "grassy terrain":
+                        battle["terrain"] = "grassy"
+                        battle["terrain_turns"] = 5
+                        action_text += "🌿 Grass grew to cover the battlefield!\n"
+                    elif m_name == "misty terrain":
+                        battle["terrain"] = "misty"
+                        battle["terrain_turns"] = 5
+                        action_text += "🌫️ Mist swirled around the battlefield!\n"
+                    elif m_name == "psychic terrain":
+                        battle["terrain"] = "psychic"
+                        battle["terrain_turns"] = 5
+                        action_text += "🔮 The battlefield got weird!\n"
+                    elif m_name == "substitute":
                         if "substitute" not in atk_pkmn.get("volatile_status", []) and atk_pkmn["hp"] > atk_pkmn["max_hp"] // 4:
                             atk_pkmn["hp"] -= atk_pkmn["max_hp"] // 4
                             atk_pkmn.setdefault("volatile_status", []).append("substitute")
@@ -898,18 +935,40 @@ async def resolve_turn(battle_id, context, query):
                             action_text += f"🗯️ {def_pkmn['name']} fell for the taunt!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name in ["confuse ray", "supersonic", "sweet kiss", "teeter dance"]:
-                        if "confused" not in def_pkmn.get("volatile_status", []):
+                        if "confused" not in def_pkmn.get("volatile_status", []) and can_status(def_pkmn, "confusion"):
                             def_pkmn.setdefault("volatile_status", []).append("confused")
                             def_pkmn["confusion_turns"] = random.randint(2, 5)
                             action_text += f"💫 {def_pkmn['name']} became confused!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name == "toxic":
-                        if "poison" in def_pkmn["types"] or "steel" in def_pkmn["types"]:
+                        if "poison" in def_pkmn["types"] or "steel" in def_pkmn["types"] or not can_status(def_pkmn, "poison"):
                             action_text += "But it failed!\n"
                         elif "substitute" not in def_pkmn.get("volatile_status", []) and not def_pkmn.get("status"):
                             def_pkmn["status"] = "badly_poisoned"
                             def_pkmn["toxic_turns"] = 1
-                            action_text += f"☠️ {def_pkmn['name']} was badly poisoned!\n"
+                            action_text += f"☣️ {def_pkmn['name']} was badly poisoned!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "thunder wave":
+                        if "ground" in def_pkmn["types"] or not can_status(def_pkmn, "paralysis"):
+                            action_text += "But it failed!\n"
+                        elif "substitute" not in def_pkmn.get("volatile_status", []) and not def_pkmn.get("status"):
+                            def_pkmn["status"] = "paralyzed"
+                            action_text += f"⚡ {def_pkmn['name']} is paralyzed! It may be unable to move!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name in ["sleep powder", "spore", "hypnosis"]:
+                        if ("grass" in def_pkmn["types"] and m_name in ["sleep powder", "spore"]) or not can_status(def_pkmn, "sleep"):
+                            action_text += "But it failed!\n"
+                        elif "substitute" not in def_pkmn.get("volatile_status", []) and not def_pkmn.get("status"):
+                            def_pkmn["status"] = "sleep"
+                            def_pkmn["sleep_turns"] = random.randint(1, 3)
+                            action_text += f"💤 {def_pkmn['name']} fell asleep!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "will-o-wisp":
+                        if "fire" in def_pkmn["types"] or not can_status(def_pkmn, "burn"):
+                            action_text += "But it failed!\n"
+                        elif "substitute" not in def_pkmn.get("volatile_status", []) and not def_pkmn.get("status"):
+                            def_pkmn["status"] = "burned"
+                            action_text += f"🔥 {def_pkmn['name']} was burned!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name in ["aromatherapy", "heal bell"]:
                         for pk in player["team"]: pk["status"] = None
@@ -1049,7 +1108,7 @@ async def resolve_turn(battle_id, context, query):
         battle["choices"] = {"p1": None, "p2": None}
         
         # End of turn effects
-        if battle.get("weather"):
+        if battle.get("weather_turns", 0) > 0:
             battle["weather_turns"] -= 1
             if battle["weather_turns"] <= 0:
                 w_msg = {"rain": "The rain stopped.", "sun": "The sunlight faded.", "sandstorm": "The sandstorm subsided.", "hail": "The hail stopped."}
@@ -1061,8 +1120,27 @@ async def resolve_turn(battle_id, context, query):
             if battle["trick_room"] == 0:
                 action_text += "The twisted dimensions returned to normal!\n"
                 
+        # Terrain Turns
+        if battle.get("terrain_turns", 0) > 0:
+            battle["terrain_turns"] -= 1
+            if battle["terrain_turns"] == 0:
+                t_name = battle["terrain"].capitalize()
+                action_text += f"🌍 The {t_name} Terrain disappeared.\n"
+                battle["terrain"] = None
+                
         for p_key in ["p1", "p2"]:
             active = battle[p_key]["team"][battle[p_key]["active"]]
+            
+            # Grassy Terrain Healing
+            if battle.get("terrain") == "grassy" and is_grounded(active) and active["hp"] > 0 and active["hp"] < active["max_hp"]:
+                heal = max(1, active["max_hp"] // 16)
+                active["hp"] = min(active["max_hp"], active["hp"] + heal)
+                action_text += f"🌿 {active['name']} restored a little HP from the Grassy Terrain!\n"
+                
+            if active["hp"] > 0 and active["hp"] < active["max_hp"] and active["item"] == "Leftovers":
+                heal = max(1, int(active["max_hp"] / 16))
+                active["hp"] = min(active["max_hp"], active["hp"] + heal)
+                action_text += f"🍏 {active['name']} restored a little HP using Leftovers!\n"
             
             # Clear volatile statuses like protect and flinch at the end of the turn
             if "protect" in active.get("volatile_status", []):
@@ -1130,11 +1208,6 @@ async def resolve_turn(battle_id, context, query):
                     if active["status"] == "burned": action_text += f"🔥 {active['name']} was hurt by its burn!\n"
                     else: action_text += f"☠️ {active['name']} was hurt by poison!\n"
                     
-            if active["hp"] > 0 and active["hp"] < active["max_hp"] and active["item"] == "Leftovers":
-                heal = max(1, int(active["max_hp"] / 16))
-                active["hp"] = min(active["max_hp"], active["hp"] + heal)
-                action_text += f"🍏 {active['name']} restored a little HP using Leftovers!\n"
-                
             if active["hp"] > 0 and active["item"] == "Black Sludge":
                 if "poison" in active["types"]:
                     heal = max(1, int(active["max_hp"] / 16))
