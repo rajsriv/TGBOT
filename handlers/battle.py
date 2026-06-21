@@ -535,6 +535,12 @@ async def resolve_turn(battle_id, context, query):
             if pkmn.get("status") == "paralyzed": base_spd *= 0.5
             if pkmn["item"] == "Choice Scarf": base_spd *= 1.5
             
+            w = battle.get("weather")
+            if w == "rain" and pkmn["ability"] == "Swift Swim": base_spd *= 2
+            elif w == "sun" and pkmn["ability"] == "Chlorophyll": base_spd *= 2
+            elif w == "sandstorm" and pkmn["ability"] == "Sand Rush": base_spd *= 2
+            elif w == "hail" and pkmn["ability"] == "Slush Rush": base_spd *= 2
+            
             if battle.get("trick_room", 0) > 0:
                 base_spd = 10000 - base_spd
             
