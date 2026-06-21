@@ -34,7 +34,7 @@ def main():
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Starting bot...")
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
