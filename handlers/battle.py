@@ -553,6 +553,31 @@ async def resolve_turn(battle_id, context, query):
                 move = atk_pkmn["moves"][choice["index"]]
                 
                 # Pre-attack status checks
+                if "confused" in atk_pkmn.get("volatile_status", []):
+                    atk_pkmn["confusion_turns"] = atk_pkmn.get("confusion_turns", 0) - 1
+                    if atk_pkmn["confusion_turns"] <= 0:
+                        atk_pkmn["volatile_status"].remove("confused")
+                        action_text += f"💫 {atk_pkmn['name']} snapped out of its confusion!\n"
+                    else:
+                        action_text += f"💫 {atk_pkmn['name']} is confused!\n"
+                        if random.randint(1, 100) <= 33:
+                            action_text += f"It hurt itself in its confusion!\n"
+                            conf_dmg = calculate_damage(atk_pkmn["level"], 40, atk_pkmn["stats"].copy(), atk_pkmn["stats"].copy(), "physical")
+                            atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - conf_dmg)
+                            if atk_pkmn["hp"] == 0:
+                                action_text += f"💀 {atk_pkmn['name']} fainted from confusion damage!\n"
+                                battle["menus"][p_key] = "force_switch"
+                            continue
+
+                if "taunted" in atk_pkmn.get("volatile_status", []):
+                    atk_pkmn["taunt_turns"] = atk_pkmn.get("taunt_turns", 0) - 1
+                    if atk_pkmn["taunt_turns"] <= 0:
+                        atk_pkmn["volatile_status"].remove("taunted")
+                        action_text += f"🗯️ {atk_pkmn['name']}'s taunt wore off!\n"
+                    elif move["power"] == 0:
+                        action_text += f"🗯️ {atk_pkmn['name']} can't use {move['name']} after the taunt!\n"
+                        continue
+
                 if "flinch" in atk_pkmn.get("volatile_status", []):
                     action_text += f"{atk_pkmn['name']} flinched and couldn't move!\n"
                     atk_pkmn["volatile_status"].remove("flinch")
@@ -728,20 +753,64 @@ async def resolve_turn(battle_id, context, query):
                 if atk_pkmn.get("status") == "burned" and move["class"] == "physical":
                     dmg = max(1, int(dmg * 0.5))
                 
-                # Track actual damage dealt
-                actual_dmg = min(def_pkmn["hp"], dmg)
-                battle[p_key]["damage_dealt"] += actual_dmg
-                def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
-                
-                if move["power"] > 0:
-                    action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
-                    if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
-                    if type_mod > 1.0: action_text += "(It's super effective!) "
-                    elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
-                    elif type_mod == 0: action_text += "(It had no effect...) "
-                    action_text += f"(-{actual_dmg} HP)\n"
+                hit_substitute = False
+                if move["power"] > 0 and "substitute" in def_pkmn.get("volatile_status", []):
+                    actual_dmg = min(def_pkmn["substitute_hp"], dmg)
+                    def_pkmn["substitute_hp"] -= dmg
+                    battle[p_key]["damage_dealt"] += actual_dmg
+                    if def_pkmn["substitute_hp"] <= 0:
+                        def_pkmn["volatile_status"].remove("substitute")
+                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! The substitute broke!\n"
+                    else:
+                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! The substitute took damage!\n"
+                    hit_substitute = True
                 else:
+                    actual_dmg = min(def_pkmn["hp"], dmg)
+                    battle[p_key]["damage_dealt"] += actual_dmg
+                    def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
+                    
+                    if move["power"] > 0:
+                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
+                        if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
+                        if type_mod > 1.0: action_text += "(It's super effective!) "
+                        elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
+                        elif type_mod == 0: action_text += "(It had no effect...) "
+                        action_text += f"(-{actual_dmg} HP)\n"
+                
+                if move["power"] == 0:
+                    m_name = move["name"].lower()
+                    
+                    if "substitute" in def_pkmn.get("volatile_status", []) and move.get("target") in ["selected-pokemon", "all-opponents"]:
+                        action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\nBut it failed against the substitute!\n"
+                        continue
+                        
                     action_text += f"✨ {atk_pkmn['name']} used {move['name']}!\n"
+                    
+                    if m_name == "substitute":
+                        if "substitute" not in atk_pkmn.get("volatile_status", []) and atk_pkmn["hp"] > atk_pkmn["max_hp"] // 4:
+                            atk_pkmn["hp"] -= atk_pkmn["max_hp"] // 4
+                            atk_pkmn.setdefault("volatile_status", []).append("substitute")
+                            atk_pkmn["substitute_hp"] = atk_pkmn["max_hp"] // 4
+                            action_text += f"🧸 {atk_pkmn['name']} put in a substitute!\n"
+                        else:
+                            action_text += "But it failed!\n"
+                    elif m_name == "leech seed":
+                        if "grass" not in def_pkmn["types"] and "leech_seed" not in def_pkmn.get("volatile_status", []):
+                            def_pkmn.setdefault("volatile_status", []).append("leech_seed")
+                            action_text += f"🌱 {def_pkmn['name']} was seeded!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "taunt":
+                        if "taunted" not in def_pkmn.get("volatile_status", []):
+                            def_pkmn.setdefault("volatile_status", []).append("taunted")
+                            def_pkmn["taunt_turns"] = 4
+                            action_text += f"🗯️ {def_pkmn['name']} fell for the taunt!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name in ["confuse ray", "supersonic", "sweet kiss", "teeter dance"]:
+                        if "confused" not in def_pkmn.get("volatile_status", []):
+                            def_pkmn.setdefault("volatile_status", []).append("confused")
+                            def_pkmn["confusion_turns"] = random.randint(2, 5)
+                            action_text += f"💫 {def_pkmn['name']} became confused!\n"
+                        else: action_text += "But it failed!\n"
                     m_name = move["name"].lower()
                     if m_name == "rain dance":
                         battle["weather"] = "rain"
@@ -795,6 +864,7 @@ async def resolve_turn(battle_id, context, query):
                     
                     stat_target = move.get("stat_target", move.get("target", "selected-pokemon"))
                     target_pkmn = atk_pkmn if stat_target in ["user", "user-and-allies"] else def_pkmn
+                    if target_pkmn == def_pkmn and hit_substitute: continue
                     
                     stat_name = sc["stat"]
                     change = sc["change"]
@@ -813,7 +883,7 @@ async def resolve_turn(battle_id, context, query):
                         action_text += f"📈 {target_pkmn['name']}'s {stat_name} {degree}{direction}!\n"
                 
                 # Secondary Effects
-                if def_pkmn["hp"] > 0 and type_mod > 0 and not def_pkmn.get("status"):
+                if def_pkmn["hp"] > 0 and type_mod > 0 and not def_pkmn.get("status") and not hit_substitute:
                     if move["type"] == "fire" and random.randint(1, 100) <= 10:
                         def_pkmn["status"] = "burned"
                         action_text += f"🔥 {def_pkmn['name']} was burned!\n"
@@ -827,7 +897,7 @@ async def resolve_turn(battle_id, context, query):
                         def_pkmn["status"] = "frozen"
                         action_text += f"🧊 {def_pkmn['name']} was frozen solid!\n"
                         
-                if def_pkmn["hp"] > 0 and type_mod > 0 and move["class"] == "physical":
+                if def_pkmn["hp"] > 0 and type_mod > 0 and move["class"] == "physical" and not hit_substitute:
                     if move["name"].lower() in ["bite", "headbutt", "rock slide", "waterfall", "iron head", "air slash", "dark pulse", "fake out"]:
                         if random.randint(1, 100) <= 30:
                             if "flinch" not in def_pkmn.setdefault("volatile_status", []):
@@ -850,6 +920,12 @@ async def resolve_turn(battle_id, context, query):
                     if atk_pkmn["hp"] == 0:
                         action_text += f"💀 {atk_pkmn['name']} fainted from Life Orb recoil!\n"
                         battle["menus"][p_key] = "force_switch"
+                        
+                if "confusion" in move.get("secondary", []) and not hit_substitute:
+                    if random.randint(1, 100) <= 20 and "confused" not in def_pkmn.get("volatile_status", []):
+                        def_pkmn.setdefault("volatile_status", []).append("confused")
+                        def_pkmn["confusion_turns"] = random.randint(2, 5)
+                        action_text += f"💫 {def_pkmn['name']} became confused!\n"
                 
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
@@ -909,6 +985,23 @@ async def resolve_turn(battle_id, context, query):
                     else:
                         action_text += f"🌨️ {active['name']} is pelted by hail!\n"
 
+            if active["hp"] <= 0: continue
+            
+            if "leech_seed" in active.get("volatile_status", []):
+                dmg = max(1, active["max_hp"] // 8)
+                active["hp"] = max(0, active["hp"] - dmg)
+                
+                opp_key = "p2" if p_key == "p1" else "p1"
+                opp_active = battle[opp_key]["team"][battle[opp_key]["active"]]
+                if opp_active["hp"] > 0 and opp_active["hp"] < opp_active["max_hp"]:
+                    opp_active["hp"] = min(opp_active["max_hp"], opp_active["hp"] + dmg)
+                    
+                if active["hp"] == 0:
+                    action_text += f"🌱 {active['name']} had its energy drained and fainted!\n"
+                    battle["menus"][p_key] = "force_switch"
+                else:
+                    action_text += f"🌱 {active['name']}'s health is sapped by Leech Seed!\n"
+                    
             if active["hp"] <= 0: continue
             
             if active.get("status") in ["burned", "poisoned"]:
