@@ -152,17 +152,54 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                 pb_y = 125
                 pb_size = 130
                 
-                draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
-                draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
+                if elo >= 1300:
+                    ball_type = "master"
+                    top_color = "#8b4ca3"
+                elif elo >= 1200:
+                    ball_type = "ultra"
+                    top_color = "#313131"
+                elif elo >= 1100:
+                    ball_type = "great"
+                    top_color = "#3b82c4"
+                else:
+                    ball_type = "poke"
+                    top_color = "#d95c50"
                 
+                # Base white circle with black outline
+                draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+                
+                # Top half (chord)
+                draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill=top_color, outline="#1a1a1a", width=2)
+                
+                if ball_type == "great":
+                    # Red marks
+                    draw.chord([pb_x+15, pb_y+15, pb_x+45, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+                    draw.chord([pb_x+pb_size-45, pb_y+15, pb_x+pb_size-15, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+                elif ball_type == "ultra":
+                    # Yellow H-shape
+                    draw.chord([pb_x+20, pb_y+10, pb_x+pb_size-20, pb_y+pb_size//2+10], 180, 360, fill="#f2d12e")
+                    draw.chord([pb_x+35, pb_y+25, pb_x+pb_size-35, pb_y+pb_size//2+10], 180, 360, fill="#313131")
+                elif ball_type == "master":
+                    # Pink circles and white M
+                    draw.ellipse([pb_x+15, pb_y+20, pb_x+45, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
+                    draw.ellipse([pb_x+pb_size-45, pb_y+20, pb_x+pb_size-15, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
+                    try:
+                        m_width = draw.textlength("M", font=title_font)
+                    except AttributeError:
+                        m_width = 15
+                    draw.text((pb_x + (pb_size - m_width)/2, pb_y+15), "M", font=title_font, fill="#ffffff")
+                
+                # Middle black band
                 band_y = pb_y + (pb_size // 2) - 4
                 draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
                 
+                # Center button (outer black circle)
                 btn_size = 36
                 btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
                 btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
                 draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
                 
+                # Center button (inner white circle)
                 ibtn_size = 20
                 ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
                 ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
