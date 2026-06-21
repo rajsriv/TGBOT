@@ -77,6 +77,27 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     challenger = msg.from_user
     target_username = context.args[0] if context.args else (msg.reply_to_message.from_user.username or msg.reply_to_message.from_user.first_name)
+    target_tag = target_username.replace("@", "")
+    target_id = msg.reply_to_message.from_user.id if msg.reply_to_message else None
+
+    # Check if either player is already in a battle
+    for b_id, b_data in active_battles.items():
+        in_battle = False
+        user_in_battle = None
+        
+        # Check challenger
+        if b_data["p1"]["id"] == challenger.id or b_data["p2"]["id"] == challenger.id:
+            in_battle = True
+            user_in_battle = challenger.first_name
+        # Check target
+        elif (target_id and (b_data["p1"]["id"] == target_id or b_data["p2"]["id"] == target_id)) or \
+             (b_data["p1"]["tag"] == target_tag or b_data["p2"]["tag"] == target_tag):
+            in_battle = True
+            user_in_battle = target_username
+            
+        if in_battle:
+            await msg.reply_text(f"⚔️ {user_in_battle} is requested to finish this battle first!", reply_to_message_id=b_data["group_msg_id"])
+            return
 
     loading_msg = await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a 6v6 Random Battle!\n\nGenerating teams... (this may take a few seconds)")
 
