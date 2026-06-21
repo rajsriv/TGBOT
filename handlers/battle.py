@@ -314,12 +314,13 @@ async def update_player_dm(battle_id, context, player_key):
     
     try: await context.bot.edit_message_caption(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], caption=text, reply_markup=reply_markup)
     except Exception as e:
+        if "Message is not modified" in str(e): return
         import asyncio
         for pkmn in me["team"]:
             if pkmn["hp"] > 0:
                 opp["damage_dealt"] += pkmn["hp"]
                 pkmn["hp"] = 0
-        battle["action_text"] = f"🏳️ {me['name']} abandoned the battle! (Message deleted or Bot blocked)"
+        battle["action_text"] = f"🏳️ {me['name']} abandoned the battle! (Error: {e})"
         asyncio.create_task(sync_battle_state(battle_id, context))
 
 async def update_spectator_dm(battle_id, context, spec_id):
