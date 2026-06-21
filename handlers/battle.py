@@ -547,13 +547,19 @@ async def resolve_turn(battle_id, context, query):
                     prio += 5000
                 elif move_name == "trick room":
                     prio -= 10000
+                elif move_name in ["roar", "whirlwind", "dragon tail", "circle throw"]:
+                    prio -= 15000
             return prio
+            
+        for p_key, choice in actions:
+            choice["pkmn_idx"] = battle[p_key]["active"]
             
         actions.sort(key=priority, reverse=True)
         
         for p_key, choice in actions:
             player, opponent = battle[p_key], battle["p2" if p_key == "p1" else "p1"]
             if player["team"][player["active"]]["hp"] <= 0: continue
+            if choice["type"] == "move" and choice.get("pkmn_idx") != player["active"]: continue
                 
             if choice["type"] == "switch":
                 old_pkmn = player["team"][player["active"]]
@@ -562,7 +568,7 @@ async def resolve_turn(battle_id, context, query):
                 
                 player["active"] = choice["index"]
                 new_pkmn = player["team"][choice["index"]]
-                action_text += f"🔄 {player['name']} withdrew {old_name} and sent out {new_pkmn['name']}!\n"
+                action_text += f"🔄 {player['name']} withdrew {old_pkmn['name']} and sent out {new_pkmn['name']}!\n"
                 action_text += apply_hazards(battle, p_key, new_pkmn)
                 if new_pkmn["hp"] <= 0:
                     action_text += f"💀 {new_pkmn['name']} fainted immediately upon switching in!\n"
@@ -1043,6 +1049,39 @@ async def resolve_turn(battle_id, context, query):
                         direction = "rose" if change > 0 else "fell"
                         degree = "sharply " if abs(change) > 1 else ""
                         action_text += f"📈 {target_pkmn['name']}'s {stat_name} {degree}{direction}!\n"
+                        
+                # Phasing (Forced Switch)
+                m_name = move["name"].lower()
+                phased = False
+                if (m_name in ["roar", "whirlwind"] and move["power"] == 0) or (m_name in ["dragon tail", "circle throw"] and actual_dmg > 0 and not hit_substitute):
+                    if def_pkmn["hp"] > 0:
+                        opp_key = "p2" if p_key == "p1" else "p1"
+                        alive_bench = [i for i, p in enumerate(opponent["team"]) if p["hp"] > 0 and i != opponent["active"]]
+                        if alive_bench:
+                            if def_pkmn["ability"] == "Suction Cups":
+                                action_text += f"🐙 {def_pkmn['name']} anchors itself with Suction Cups!\n"
+                            else:
+                                new_idx = random.choice(alive_bench)
+                                old_name = def_pkmn["name"]
+                                opponent["active"] = new_idx
+                                new_pkmn = opponent["team"][new_idx]
+                                def_pkmn["toxic_turns"] = 1
+                                if "choice_locked" in def_pkmn: del def_pkmn["choice_locked"]
+                                def_pkmn["volatile_status"] = [] # Clear volatile status
+                                
+                                action_text += f"🌪️ {old_name} was blown away! {new_pkmn['name']} was dragged out!\n"
+                                
+                                action_text += apply_hazards(battle, opp_key, new_pkmn)
+                                if new_pkmn["hp"] <= 0:
+                                    action_text += f"💀 {new_pkmn['name']} fainted immediately upon being dragged in!\n"
+                                    battle["menus"][opp_key] = "force_switch"
+                                else:
+                                    switch_hook_msg = execute_ability_hook("on_switch_in", new_pkmn["ability"], pkmn=new_pkmn, opp_pkmn=atk_pkmn, battle=battle)
+                                    if switch_hook_msg: action_text += switch_hook_msg
+                                phased = True
+                                def_pkmn = new_pkmn
+                        else:
+                            if m_name in ["roar", "whirlwind"]: action_text += "But it failed!\n"
                 
                 # Secondary Effects
                 if def_pkmn["hp"] > 0 and type_mod > 0 and not def_pkmn.get("status") and not hit_substitute:
