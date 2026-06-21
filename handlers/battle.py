@@ -460,6 +460,9 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await sync_battle_state(battle_id, context)
     else: await sync_battle_state(battle_id, context)
 
+def is_grounded(pkmn):
+    return "flying" not in pkmn["types"] and pkmn["ability"] != "Levitate"
+
 def apply_hazards(battle, p_key, pkmn):
     hazards = battle["hazards"][p_key]
     text = ""
@@ -1013,23 +1016,23 @@ async def resolve_turn(battle_id, context, query):
                         battle["weather_turns"] = 5
                         action_text += "🌨️ It started to hail!\n"
                     elif m_name == "stealth rock":
-                        if not battle["hazards"][opponent_key]["stealth_rock"]:
-                            battle["hazards"][opponent_key]["stealth_rock"] = True
+                        if not battle["hazards"][opp_key]["stealth_rock"]:
+                            battle["hazards"][opp_key]["stealth_rock"] = True
                             action_text += f"🪨 Pointed stones float in the air around {opponent['name']}'s team!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name == "spikes":
-                        if battle["hazards"][opponent_key]["spikes"] < 3:
-                            battle["hazards"][opponent_key]["spikes"] += 1
+                        if battle["hazards"][opp_key]["spikes"] < 3:
+                            battle["hazards"][opp_key]["spikes"] += 1
                             action_text += f"🪡 Spikes were scattered all around the feet of {opponent['name']}'s team!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name == "toxic spikes":
-                        if battle["hazards"][opponent_key]["toxic_spikes"] < 2:
-                            battle["hazards"][opponent_key]["toxic_spikes"] += 1
+                        if battle["hazards"][opp_key]["toxic_spikes"] < 2:
+                            battle["hazards"][opp_key]["toxic_spikes"] += 1
                             action_text += f"☠️ Poison spikes were scattered all around the feet of {opponent['name']}'s team!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name == "sticky web":
-                        if not battle["hazards"][opponent_key]["sticky_web"]:
-                            battle["hazards"][opponent_key]["sticky_web"] = True
+                        if not battle["hazards"][opp_key]["sticky_web"]:
+                            battle["hazards"][opp_key]["sticky_web"] = True
                             action_text += f"🕸️ A sticky web spreads out on the ground around {opponent['name']}'s team!\n"
                         else: action_text += "But it failed!\n"
                     elif m_name == "defog":
