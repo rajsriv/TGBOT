@@ -300,12 +300,15 @@ async def update_player_dm(battle_id, context, player_key):
     my_status = f" [{my_active['status'].upper()}]" if my_active.get("status") else ""
     opp_status = f" [{opp_active['status'].upper()}]" if opp_active.get("status") else ""
 
+    my_types = "-".join(t.capitalize() for t in my_active["types"])
+    opp_types = "-".join(t.capitalize() for t in opp_active["types"])
+
     text += (
         f"{my_hp_bar} {my_active['hp']}/{my_active['max_hp']} HP\n"
-        f"▛ Your {my_active['name']}{my_status} (Poké: {me_alive}/6)\n"
+        f"▛ Your {my_active['name']}{my_status} ({my_types} | {my_active.get('level', 100)})\n"
         f"╰ Item: {my_active['item']} | Ability: {my_active['ability']}\n\n"
         f"{opp_hp_bar} {int(opp_hp_pct * 100)}% HP\n"
-        f"▙ Enemy {opp_active['name']}{opp_status} (Poké: {opp_alive}/6)\n\n"
+        f"▙ Enemy {opp_active['name']}{opp_status} ({opp_types} | {opp_active.get('level', 100)})\n\n"
     )
     
     thinking = []
@@ -359,11 +362,12 @@ async def update_spectator_dm(battle_id, context, spec_id):
         bars = max(1, int(round(hp_pct * 10))) if active['hp'] > 0 else 0
         hp_bar = "▓" * bars + "░" * (10 - bars)
         status = f" [{active['status'].upper()}]" if active.get("status") else ""
+        types = "-".join(t.capitalize() for t in active["types"])
         
         text += (
             f"<b>{name}'s Team:</b>\n"
             f"{hp_bar} {int(hp_pct * 100)}% HP\n"
-            f"▙ {active['name']}{status} (Poké: {alive}/6)\n\n"
+            f"▙ {active['name']}{status} ({types} | {active.get('level', 100)})\n\n"
         )
         
     thinking = []
