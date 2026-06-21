@@ -2,7 +2,7 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-def generate_trainer_card(user_data, team=None):
+def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_team=None):
     # Dimensions
     WIDTH, HEIGHT = 480, 320
     
@@ -31,6 +31,7 @@ def generate_trainer_card(user_data, team=None):
     # Bottom left/right red solid squares
     draw.rectangle([margin, HEIGHT - margin - box_size, margin + box_size, HEIGHT - margin], fill=BORDER_RED)
     draw.rectangle([WIDTH - margin - box_size, HEIGHT - margin - box_size, WIDTH - margin, HEIGHT - margin], fill=BORDER_RED)
+    
     # Load fonts
     font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
     
@@ -44,7 +45,8 @@ def generate_trainer_card(user_data, team=None):
         small_font = ImageFont.load_default()
 
     # Draw Title (Center Top, Black)
-    title_text = "TRAINER CARD"
+    title_text = f"{card_type} CARD" if card_type == "TRAINER" else card_type
+    if card_type == "BATTLE": title_text = "BATTLE CARD"
     try:
         title_width = draw.textlength(title_text, font=title_font)
     except AttributeError:
@@ -63,81 +65,125 @@ def generate_trainer_card(user_data, team=None):
     username = str(name_str)[:12].upper()
     draw.text((20, 65), f"NAME: {username}", font=title_font, fill=TEXT_BLACK)
     
-    # Draw Stats on the right side
-    stat_x = 260
-    y_start = 100
-    spacing = 30
-    
-    wins = user_data.get('wins', 0)
-    losses = user_data.get('losses', 0)
-    total_dmg = user_data.get('total_damage', 0)
-    total_battles = wins + losses
-    avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
-    win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
-    dex_seen = len(user_data.get('dex', []))
-    elo = user_data.get('elo', 1000)
-    
-    draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
-    draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
-    draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
-    draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
-    draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
+    # If no opponent team is provided, use the standard layout
+    if not opponent_team:
+        # Draw Stats on the right side
+        stat_x = 260
+        y_start = 100
+        spacing = 30
+        
+        wins = user_data.get('wins', 0)
+        losses = user_data.get('losses', 0)
+        total_dmg = user_data.get('total_damage', 0)
+        total_battles = wins + losses
+        avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
+        win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
+        dex_seen = len(user_data.get('dex', []))
+        elo = user_data.get('elo', 1000)
+        
+        draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
+        draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
+        draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
+        draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
+        draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
 
-    if team:
-        start_x = 20
-        start_y = 125
-        box_w, box_h = 70, 70
-        gap = 5
-        
-        for i, pkmn in enumerate(team):
-            if i >= 6: break
-            row = i // 3
-            col = i % 3
-            x = start_x + col * (box_w + gap)
-            y = start_y + row * (box_h + gap)
+        if team:
+            start_x = 20
+            start_y = 125
+            box_w, box_h = 70, 70
+            gap = 5
             
-            draw.rectangle([x, y, x + box_w, y + box_h], outline="#313131", fill="#ffffff", width=2)
-            
-            if "sprite" in pkmn and pkmn["sprite"]:
-                try:
-                    sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
-                    sprite_img = sprite_img.resize((64, 64), Image.NEAREST)
-                    
-                    if pkmn.get("hp", 1) <= 0:
-                        # Grayscale for fainted
-                        la = sprite_img.convert("LA")
-                        sprite_img = la.convert("RGBA")
+            for i, pkmn in enumerate(team):
+                if i >= 6: break
+                row = i // 3
+                col = i % 3
+                x = start_x + col * (box_w + gap)
+                y = start_y + row * (box_h + gap)
+                
+                draw.rectangle([x, y, x + box_w, y + box_h], outline="#313131", fill="#ffffff", width=2)
+                
+                if "sprite" in pkmn and pkmn["sprite"]:
+                    try:
+                        sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
+                        sprite_img = sprite_img.resize((64, 64), Image.NEAREST)
                         
-                    img.paste(sprite_img, (x + 3, y + 3), sprite_img)
-                except Exception as e:
-                    pass
+                        if pkmn.get("hp", 1) <= 0:
+                            la = sprite_img.convert("LA")
+                            sprite_img = la.convert("RGBA")
+                            
+                        img.paste(sprite_img, (x + 3, y + 3), sprite_img)
+                    except Exception as e:
+                        pass
+        else:
+            # Draw a big Pokeball in the empty space on the left
+            pb_x = 55
+            pb_y = 125
+            pb_size = 130
+            
+            draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+            draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
+            
+            band_y = pb_y + (pb_size // 2) - 4
+            draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
+            
+            btn_size = 36
+            btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
+            btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
+            draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
+            
+            ibtn_size = 20
+            ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
+            ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
+            draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
     else:
-        # Draw a big Pokeball in the empty space on the left
-        pb_x = 55
-        pb_y = 125
-        pb_size = 130
+        # VS Layout (BATTLE / RESULT)
+        box_w, box_h = 56, 56
+        gap = 5
+        start_y = 100
         
-        # Base white circle with black outline
-        draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+        # Helper to draw a team as a 2x3 grid
+        def draw_team_grid(t_data, x_offset):
+            for i, pkmn in enumerate(t_data):
+                if i >= 6: break
+                row = i % 3
+                col = i // 3
+                x = x_offset + col * (box_w + gap)
+                y = start_y + row * (box_h + gap)
+                
+                draw.rectangle([x, y, x + box_w, y + box_h], outline="#313131", fill="#ffffff", width=2)
+                
+                if "sprite" in pkmn and pkmn["sprite"]:
+                    try:
+                        sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
+                        sprite_img = sprite_img.resize((48, 48), Image.NEAREST)
+                        
+                        if pkmn.get("hp", 1) <= 0:
+                            la = sprite_img.convert("LA")
+                            sprite_img = la.convert("RGBA")
+                            
+                        img.paste(sprite_img, (x + 4, y + 4), sprite_img)
+                    except Exception as e:
+                        pass
         
-        # Top red half (chord)
-        draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill="#d95c50", outline="#1a1a1a", width=2)
+        # Player Team on Left
+        draw_team_grid(team, 40)
         
-        # Middle black band
-        band_y = pb_y + (pb_size // 2) - 4
-        draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
+        # Opponent Team on Right
+        draw_team_grid(opponent_team, WIDTH - 40 - (2 * box_w) - gap)
         
-        # Center button (outer black circle)
-        btn_size = 36
-        btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
-        btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
-        draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
-        
-        # Center button (inner white circle)
-        ibtn_size = 20
-        ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
-        ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
-        draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
+        # VS in the middle
+        try:
+            vs_font = ImageFont.truetype(font_path, 36)
+        except:
+            vs_font = ImageFont.load_default()
+            
+        vs_text = "VS"
+        try:
+            vs_width = draw.textlength(vs_text, font=vs_font)
+        except AttributeError:
+            vs_width = 40
+            
+        draw.text(((WIDTH - vs_width) / 2, start_y + 60), vs_text, font=vs_font, fill=BORDER_RED)
     # Save to bytes
     bio = io.BytesIO()
     img.save(bio, format="PNG")

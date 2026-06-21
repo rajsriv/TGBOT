@@ -130,7 +130,13 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
     battle[player_key]["dm_chat_id"] = update.message.chat_id
     
     user_db["first_name"] = user.first_name
-    card_bytes = generate_trainer_card(user_db, battle[player_key]["team"])
+    opponent_key = "p2" if player_key == "p1" else "p1"
+    card_bytes = generate_trainer_card(
+        user_db, 
+        team=battle[player_key]["team"], 
+        card_type="BATTLE",
+        opponent_team=battle[opponent_key]["team"] if battle[opponent_key]["id"] else None
+    )
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
         dm_msg = await update.message.reply_photo(photo=card_bytes, caption="Entering the arena...")
@@ -221,7 +227,14 @@ async def sync_battle_state(battle_id, context):
             winner_db = await db.get_user(battle[winner_key]["id"]) if winner_db else {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
             
             winner_db["first_name"] = battle[winner_key]["name"]
-            winner_card = generate_trainer_card(winner_db, battle[winner_key]["team"])
+            loser_key = "p1" if winner_key == "p2" else "p2"
+            
+            winner_card = generate_trainer_card(
+                winner_db, 
+                team=battle[winner_key]["team"],
+                card_type="RESULT",
+                opponent_team=battle[loser_key]["team"]
+            )
             await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n<b>{winner}</b> defeated <b>{loser}</b> in a 6v6 Showdown!{elo_text}", parse_mode="HTML")
         except Exception: pass
         
