@@ -4,6 +4,7 @@ from engine import fetch_random_team, calculate_damage
 from utils.formulas import get_stat_multiplier
 from utils.type_chart import get_type_multiplier
 from utils.card_generator import generate_trainer_card
+from utils.abilities import execute_ability_hook
 from database import db
 import random
 
@@ -515,6 +516,10 @@ async def resolve_turn(battle_id, context, query):
                     # Stays in force switch menu
                 else:
                     battle["menus"][p_key] = "main"
+                    opp_key = "p2" if p_key == "p1" else "p1"
+                    opp_pkmn = battle[opp_key]["team"][battle[opp_key]["active"]]
+                    switch_hook_msg = execute_ability_hook("on_switch_in", pkmn["ability"], pkmn=pkmn, opp_pkmn=opp_pkmn, battle=battle)
+                    if switch_hook_msg: action_text += switch_hook_msg
         battle["choices"] = {"p1": None, "p2": None}
     else:
         actions = []
@@ -560,6 +565,11 @@ async def resolve_turn(battle_id, context, query):
                 if new_pkmn["hp"] <= 0:
                     action_text += f"💀 {new_pkmn['name']} fainted immediately upon switching in!\n"
                     battle["menus"][p_key] = "force_switch"
+                else:
+                    opp_key = "p2" if p_key == "p1" else "p1"
+                    opp_pkmn = battle[opp_key]["team"][battle[opp_key]["active"]]
+                    switch_hook_msg = execute_ability_hook("on_switch_in", new_pkmn["ability"], pkmn=new_pkmn, opp_pkmn=opp_pkmn, battle=battle)
+                    if switch_hook_msg: action_text += switch_hook_msg
             elif choice["type"] == "move":
                 atk_pkmn, def_pkmn = player["team"][player["active"]], opponent["team"][opponent["active"]]
                 move = atk_pkmn["moves"][choice["index"]]
@@ -695,17 +705,15 @@ async def resolve_turn(battle_id, context, query):
                 type_mod = get_type_multiplier(move["type"], def_pkmn["types"])
                 
                 # Abilities (Defender)
-                if def_pkmn["ability"] == "Levitate" and move["type"] == "ground":
-                    type_mod = 0.0
+                defense_mod = execute_ability_hook("on_defense", def_pkmn["ability"], move=move)
+                if defense_mod is not None:
+                    type_mod *= defense_mod
                     
                 stab = 1.5 if move["type"] in atk_pkmn["types"] else 1.0
                 
                 # Abilities (Attacker)
-                if atk_pkmn["hp"] <= atk_pkmn["max_hp"] / 3:
-                    if atk_pkmn["ability"] == "Overgrow" and move["type"] == "grass": stab *= 1.5
-                    elif atk_pkmn["ability"] == "Blaze" and move["type"] == "fire": stab *= 1.5
-                    elif atk_pkmn["ability"] == "Torrent" and move["type"] == "water": stab *= 1.5
-                    elif atk_pkmn["ability"] == "Swarm" and move["type"] == "bug": stab *= 1.5
+                attack_mod = execute_ability_hook("on_attack", atk_pkmn["ability"], atk_pkmn=atk_pkmn, move=move, stab=stab)
+                if attack_mod is not None: stab = attack_mod
                 
                 is_crit = False
                 if random.randint(1, 100) <= 6: # ~6.25% standard gen crit chance
@@ -755,19 +763,18 @@ async def resolve_turn(battle_id, context, query):
                 elif atk_pkmn["item"] == "Life Orb":
                     dmg = int(dmg * 1.3)
                     
-                # Abilities (Defender) passive
-                if move["class"] == "physical" and def_pkmn["ability"] == "Intimidate":
-                    dmg = int(dmg * 0.67)
-                    
                 # Items/Abilities preventing OHKO
                 if dmg >= def_pkmn["hp"] and def_pkmn["hp"] == def_pkmn["max_hp"]:
-                    if def_pkmn["ability"] == "Sturdy":
-                        dmg = def_pkmn["max_hp"] - 1
-                        action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
-                    elif def_pkmn["item"] == "Focus Sash":
+                    if def_pkmn["item"] == "Focus Sash":
                         dmg = def_pkmn["max_hp"] - 1
                         def_pkmn["item"] = "None"
                         action_text += f"🎗️ {def_pkmn['name']} hung on using its Focus Sash!\n"
+                
+                dmg_hook = execute_ability_hook("on_damage", def_pkmn["ability"], dmg=dmg, def_pkmn=def_pkmn)
+                if dmg_hook is not None:
+                    if dmg_hook < dmg and dmg_hook == def_pkmn["max_hp"] - 1:
+                        action_text += f"🛡️ {def_pkmn['name']} endured the hit due to Sturdy!\n"
+                    dmg = dmg_hook
                         
                 if atk_pkmn.get("status") == "burned" and move["class"] == "physical":
                     dmg = max(1, int(dmg * 0.5))
@@ -795,6 +802,10 @@ async def resolve_turn(battle_id, context, query):
                         elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
                         elif type_mod == 0: action_text += "(It had no effect...) "
                         action_text += f"(-{actual_dmg} HP)\n"
+                        
+                        if actual_dmg > 0 and not hit_substitute:
+                            hit_msg = execute_ability_hook("on_hit_receive", def_pkmn["ability"], move=move, atk_pkmn=atk_pkmn)
+                            if hit_msg: action_text += hit_msg
                 
                 if move["power"] == 0:
                     m_name = move["name"].lower()
