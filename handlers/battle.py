@@ -780,28 +780,53 @@ async def resolve_turn(battle_id, context, query):
                     dmg = max(1, int(dmg * 0.5))
                 
                 hit_substitute = False
-                if move["power"] > 0 and "substitute" in def_pkmn.get("volatile_status", []):
-                    actual_dmg = min(def_pkmn["substitute_hp"], dmg)
-                    def_pkmn["substitute_hp"] -= dmg
-                    battle[p_key]["damage_dealt"] += actual_dmg
-                    if def_pkmn["substitute_hp"] <= 0:
-                        def_pkmn["volatile_status"].remove("substitute")
-                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! The substitute broke!\n"
-                    else:
-                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! The substitute took damage!\n"
-                    hit_substitute = True
-                else:
-                    actual_dmg = min(def_pkmn["hp"], dmg)
-                    battle[p_key]["damage_dealt"] += actual_dmg
-                    def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
+                hits = 1
+                multi_2 = ["double kick", "twinneedle", "gear grind", "bonemerang", "dual chop", "double hit"]
+                multi_2_5 = ["bullet seed", "icicle spear", "rock blast", "pin missile", "bone rush", "fury swipes", "double slap", "comet punch", "spike cannon", "barrage", "fury attack", "tail slap", "water shuriken"]
+                m_name_lower = move["name"].lower()
+                
+                if m_name_lower in multi_2: hits = 2
+                elif m_name_lower in multi_2_5:
+                    r = random.randint(1, 100)
+                    if r <= 35: hits = 2
+                    elif r <= 70: hits = 3
+                    elif r <= 85: hits = 4
+                    else: hits = 5
                     
-                    if move["power"] > 0:
-                        action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
-                        if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
-                        if type_mod > 1.0: action_text += "(It's super effective!) "
-                        elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
-                        elif type_mod == 0: action_text += "(It had no effect...) "
-                        action_text += f"(-{actual_dmg} HP)\n"
+                total_actual_dmg = 0
+                hits_landed = 0
+                
+                if move["power"] > 0:
+                    action_text += f"💥 {atk_pkmn['name']} used {move['name']}! "
+                    
+                    for _ in range(hits):
+                        if def_pkmn["hp"] <= 0: break
+                        hits_landed += 1
+                        
+                        if "substitute" in def_pkmn.get("volatile_status", []):
+                            actual_dmg = min(def_pkmn["substitute_hp"], dmg)
+                            def_pkmn["substitute_hp"] -= dmg
+                            total_actual_dmg += actual_dmg
+                            hit_substitute = True
+                            if def_pkmn["substitute_hp"] <= 0:
+                                def_pkmn["volatile_status"].remove("substitute")
+                                action_text += f"(The substitute broke!) "
+                        else:
+                            actual_dmg = min(def_pkmn["hp"], dmg)
+                            total_actual_dmg += actual_dmg
+                            def_pkmn["hp"] = max(0, def_pkmn["hp"] - dmg)
+                            hit_substitute = False
+                            
+                    battle[p_key]["damage_dealt"] += total_actual_dmg
+                    
+                    if hits_landed > 1: action_text += f"Hit {hits_landed} time(s)! "
+                    if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
+                    if type_mod > 1.0: action_text += "(It's super effective!) "
+                    elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
+                    elif type_mod == 0: action_text += "(It had no effect...) "
+                    action_text += f"(-{total_actual_dmg} HP)\n"
+                    
+                    actual_dmg = total_actual_dmg
                         
                         if actual_dmg > 0 and not hit_substitute:
                             hit_msg = execute_ability_hook("on_hit_receive", def_pkmn["ability"], move=move, atk_pkmn=atk_pkmn)
