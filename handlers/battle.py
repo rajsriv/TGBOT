@@ -76,7 +76,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     challenger = msg.from_user
-    target_username = context.args[0] if context.args else msg.reply_to_message.from_user.username
+    target_username = context.args[0] if context.args else (msg.reply_to_message.from_user.username or msg.reply_to_message.from_user.first_name)
 
     loading_msg = await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a 6v6 Random Battle!\n\nGenerating teams... (this may take a few seconds)")
 
@@ -88,7 +88,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "group_chat_id": msg.chat_id,
         "group_msg_id": msg.message_id,
         "action_text": "",
-        "p1": {"id": challenger.id, "name": challenger.first_name, "tag": challenger.username, "team": p1_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
+        "p1": {"id": challenger.id, "name": challenger.first_name, "tag": challenger.username or challenger.first_name, "team": p1_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "p2": {"id": None, "name": target_username, "tag": target_username.replace("@", ""), "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "choices": {"p1": None, "p2": None},
         "menus": {"p1": "main", "p2": "main"},
