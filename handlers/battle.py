@@ -166,8 +166,16 @@ def get_player_buttons(battle, player_key, battle_id):
     
     if menu == "main":
         active_pkmn = p_data["team"][p_data["active"]]
-        row1 = [InlineKeyboardButton(str(i+1), callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i in range(min(2, len(active_pkmn['moves'])))]
-        row2 = [InlineKeyboardButton(str(i+1), callback_data=f"btn_{battle_id}_{player_key}_move_{i}") for i in range(2, len(active_pkmn['moves']))]
+        locked_move = active_pkmn.get("choice_locked")
+        
+        row1 = []
+        row2 = []
+        for i in range(len(active_pkmn['moves'])):
+            if locked_move is not None and locked_move != i: continue
+            btn = InlineKeyboardButton(str(i+1), callback_data=f"btn_{battle_id}_{player_key}_move_{i}")
+            if len(row1) < 2: row1.append(btn)
+            else: row2.append(btn)
+            
         switch_btn = [InlineKeyboardButton(f"Switch Pokémon", callback_data=f"btn_{battle_id}_{player_key}_menu_switch")]
         resign_btn = [InlineKeyboardButton(f"🏳️ Resign", callback_data=f"btn_{battle_id}_{player_key}_menu_resign")]
         if row1: buttons.append(row1)
@@ -518,6 +526,7 @@ async def resolve_turn(battle_id, context, query):
             pkmn = battle[p]["team"][battle[p]["active"]]
             base_spd = pkmn["stats"]["spd"] * get_stat_multiplier(pkmn["stat_stages"].get("spd", 0))
             if pkmn.get("status") == "paralyzed": base_spd *= 0.5
+            if pkmn["item"] == "Choice Scarf": base_spd *= 1.5
             
             if battle.get("trick_room", 0) > 0:
                 base_spd = 10000 - base_spd
@@ -540,7 +549,10 @@ async def resolve_turn(battle_id, context, query):
             if player["team"][player["active"]]["hp"] <= 0: continue
                 
             if choice["type"] == "switch":
-                old_name = player["team"][player["active"]]["name"]
+                old_pkmn = player["team"][player["active"]]
+                old_pkmn["toxic_turns"] = 1
+                if "choice_locked" in old_pkmn: del old_pkmn["choice_locked"]
+                
                 player["active"] = choice["index"]
                 new_pkmn = player["team"][choice["index"]]
                 action_text += f"🔄 {player['name']} withdrew {old_name} and sent out {new_pkmn['name']}!\n"
@@ -644,6 +656,8 @@ async def resolve_turn(battle_id, context, query):
                     if "invulnerable" in atk_pkmn["volatile_status"]: atk_pkmn["volatile_status"].remove("invulnerable")
                 else:
                     move["pp"] -= 1 # Normal move
+                    if "Choice" in atk_pkmn["item"] and "choice_locked" not in atk_pkmn:
+                        atk_pkmn["choice_locked"] = choice["index"]
                 
                 if move["name"].lower() in ["protect", "detect"]:
                     if "protect" not in atk_pkmn.get("volatile_status", []):
@@ -701,6 +715,11 @@ async def resolve_turn(battle_id, context, query):
                 # Apply stat stages
                 atk_stats = atk_pkmn["stats"].copy()
                 def_stats = def_pkmn["stats"].copy()
+                
+                if atk_pkmn["item"] == "Choice Band" and move["class"] == "physical":
+                    atk_stats["atk"] = int(atk_stats["atk"] * 1.5)
+                elif atk_pkmn["item"] == "Choice Specs" and move["class"] == "special":
+                    atk_stats["sp_atk"] = int(atk_stats["sp_atk"] * 1.5)
                 
                 # Critical hits ignore attacker's negative stages and defender's positive stages
                 if move["class"] == "physical":
@@ -811,7 +830,18 @@ async def resolve_turn(battle_id, context, query):
                             def_pkmn["confusion_turns"] = random.randint(2, 5)
                             action_text += f"💫 {def_pkmn['name']} became confused!\n"
                         else: action_text += "But it failed!\n"
-                    m_name = move["name"].lower()
+                    elif m_name == "toxic":
+                        if "poison" in def_pkmn["types"] or "steel" in def_pkmn["types"]:
+                            action_text += "But it failed!\n"
+                        elif "substitute" not in def_pkmn.get("volatile_status", []) and not def_pkmn.get("status"):
+                            def_pkmn["status"] = "badly_poisoned"
+                            def_pkmn["toxic_turns"] = 1
+                            action_text += f"☠️ {def_pkmn['name']} was badly poisoned!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name in ["aromatherapy", "heal bell"]:
+                        for pk in player["team"]: pk["status"] = None
+                        action_text += f"✨ A soothing bell chimed! {player['name']}'s team was cured of all status problems!\n"
+                    
                     if m_name == "rain dance":
                         battle["weather"] = "rain"
                         battle["weather_turns"] = 5
@@ -927,6 +957,13 @@ async def resolve_turn(battle_id, context, query):
                         def_pkmn["confusion_turns"] = random.randint(2, 5)
                         action_text += f"💫 {def_pkmn['name']} became confused!\n"
                 
+                for p_idx in [atk_pkmn, def_pkmn]:
+                    if p_idx["item"] == "Lum Berry" and (p_idx.get("status") or "confused" in p_idx.get("volatile_status", [])):
+                        p_idx["status"] = None
+                        if "confused" in p_idx.get("volatile_status", []): p_idx["volatile_status"].remove("confused")
+                        p_idx["item"] = "None"
+                        action_text += f"🍒 {p_idx['name']} cured its status problem using its Lum Berry!\n"
+                
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
                     battle["menus"]["p2" if p_key == "p1" else "p1"] = "force_switch"
@@ -1004,8 +1041,13 @@ async def resolve_turn(battle_id, context, query):
                     
             if active["hp"] <= 0: continue
             
-            if active.get("status") in ["burned", "poisoned"]:
-                dmg = max(1, active["max_hp"] // 8)
+            if active.get("status") in ["burned", "poisoned", "badly_poisoned"]:
+                if active["status"] == "badly_poisoned":
+                    dmg = max(1, active["max_hp"] * active.get("toxic_turns", 1) // 16)
+                    active["toxic_turns"] = active.get("toxic_turns", 1) + 1
+                else:
+                    dmg = max(1, active["max_hp"] // 8)
+                    
                 active["hp"] = max(0, active["hp"] - dmg)
                 if active["hp"] == 0:
                     if active["status"] == "burned": action_text += f"🔥 {active['name']} fainted from its burn!\n"
@@ -1019,6 +1061,21 @@ async def resolve_turn(battle_id, context, query):
                 heal = max(1, int(active["max_hp"] / 16))
                 active["hp"] = min(active["max_hp"], active["hp"] + heal)
                 action_text += f"🍏 {active['name']} restored a little HP using Leftovers!\n"
+                
+            if active["hp"] > 0 and active["item"] == "Black Sludge":
+                if "poison" in active["types"]:
+                    heal = max(1, int(active["max_hp"] / 16))
+                    if active["hp"] < active["max_hp"]:
+                        active["hp"] = min(active["max_hp"], active["hp"] + heal)
+                        action_text += f"🛢️ {active['name']} restored a little HP using Black Sludge!\n"
+                else:
+                    dmg = max(1, int(active["max_hp"] / 8))
+                    active["hp"] = max(0, active["hp"] - dmg)
+                    if active["hp"] == 0:
+                        action_text += f"💀 {active['name']} fainted from Black Sludge!\n"
+                        battle["menus"][p_key] = "force_switch"
+                    else:
+                        action_text += f"🛢️ {active['name']} was hurt by Black Sludge!\n"
         
     reset_timeout(context, battle_id)
     battle["action_text"] = action_text
