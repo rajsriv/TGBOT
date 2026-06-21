@@ -129,6 +129,7 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
         
     battle[player_key]["dm_chat_id"] = update.message.chat_id
     
+    user_db["first_name"] = user.first_name
     card_bytes = generate_trainer_card(user_db, battle[player_key]["team"])
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
@@ -219,6 +220,7 @@ async def sync_battle_state(battle_id, context):
             # Re-fetch winner DB to get the newly updated stats (including just-added win and elo)
             winner_db = await db.get_user(battle[winner_key]["id"]) if winner_db else {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
             
+            winner_db["first_name"] = battle[winner_key]["name"]
             winner_card = generate_trainer_card(winner_db, battle[winner_key]["team"])
             await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n<b>{winner}</b> defeated <b>{loser}</b> in a 6v6 Showdown!{elo_text}", parse_mode="HTML")
         except Exception: pass
