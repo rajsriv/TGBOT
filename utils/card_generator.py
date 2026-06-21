@@ -21,6 +21,16 @@ def generate_trainer_card(user_data, team=None):
     # Top red header
     draw.rectangle([12, 12, WIDTH-12, 50], fill=BORDER_RED)
     
+    # Corner Decorative Mini-Boxes
+    # Top left/right beige cutouts
+    box_size = 14
+    margin = 18
+    draw.rectangle([margin, margin, margin + box_size, margin + box_size], outline=BG_BEIGE, width=4)
+    draw.rectangle([WIDTH - margin - box_size, margin, WIDTH - margin, margin + box_size], outline=BG_BEIGE, width=4)
+    
+    # Bottom left/right red solid squares
+    draw.rectangle([margin, HEIGHT - margin - box_size, margin + box_size, HEIGHT - margin], fill=BORDER_RED)
+    draw.rectangle([WIDTH - margin - box_size, HEIGHT - margin - box_size, WIDTH - margin, HEIGHT - margin], fill=BORDER_RED)
     # Load fonts
     font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
     
