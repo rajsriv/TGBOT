@@ -232,7 +232,8 @@ async def sync_battle_state(battle_id, context):
                 winner_db, 
                 team=battle[winner_key]["team"],
                 card_type="RESULT",
-                opponent_team=battle[loser_key]["team"]
+                opponent_team=battle[loser_key]["team"],
+                opponent_name=battle[loser_key]["name"]
             )
             await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n<b>{winner}</b> defeated <b>{loser}</b> in a 6v6 Showdown!{elo_text}", parse_mode="HTML")
         except Exception: pass

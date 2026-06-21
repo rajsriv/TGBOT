@@ -2,7 +2,7 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_team=None):
+def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_team=None, opponent_name=None):
     # Dimensions
     WIDTH, HEIGHT = 480, 320
     
@@ -196,10 +196,17 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                         pass
         
         # Player Team on Left
-        draw_team_grid(team, 40)
+        left_x = 40
+        if card_type == "RESULT":
+            draw.text((left_x, 80), str(username)[:10].upper(), font=text_font, fill=TEXT_BLACK)
+            draw.rectangle([left_x - 4, start_y - 4, left_x + 117 + 4, start_y + 178 + 4], outline=BORDER_RED, width=3)
+        draw_team_grid(team, left_x)
         
         # Opponent Team on Right
-        draw_team_grid(opponent_team, WIDTH - 40 - (2 * box_w) - gap)
+        right_x = WIDTH - 40 - (2 * box_w) - gap
+        if card_type == "RESULT" and opponent_name:
+            draw.text((right_x, 80), str(opponent_name)[:10].upper(), font=text_font, fill=TEXT_BLACK)
+        draw_team_grid(opponent_team, right_x)
         
         # VS in the middle
         try:
