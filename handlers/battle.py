@@ -125,11 +125,11 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
         
     user_db = await db.get_user(user.id)
     if not user_db:
-        await db.create_user(user.id, user.username or user.first_name)
+        user_db = await db.create_user(user.id, user.username or user.first_name)
         
     battle[player_key]["dm_chat_id"] = update.message.chat_id
     
-    card_bytes = generate_trainer_card({"_id": user.id, "username": user.first_name}, battle[player_key]["team"])
+    card_bytes = generate_trainer_card(user_db, battle[player_key]["team"])
     
     if battle["p1"]["dm_chat_id"] and battle["p2"]["dm_chat_id"]:
         dm_msg = await update.message.reply_photo(photo=card_bytes, caption="Entering the arena...")
@@ -198,8 +198,11 @@ async def sync_battle_state(battle_id, context):
             p1_elo_change = int(k * ((1 if p1_won else 0) - p1_expected))
             p2_elo_change = int(k * ((1 if p2_won else 0) - p2_expected))
             
-            await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change)
-            await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change)
+            p1_seen = [p["name"] for p in battle["p1"]["team"]] + [p["name"] for p in battle["p2"]["team"]]
+            p2_seen = p1_seen
+            
+            await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change, p1_seen)
+            await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change, p2_seen)
             
             elo_text = f"\n\n📈 {battle['p1']['name']}: {p1_elo_change:+d} Elo\n📉 {battle['p2']['name']}: {p2_elo_change:+d} Elo"
             win_text += elo_text
@@ -211,8 +214,12 @@ async def sync_battle_state(battle_id, context):
                 
         try:
             winner_key = "p2" if p1_alive == 0 else "p1"
-            winner_user = {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
-            winner_card = generate_trainer_card(winner_user, battle[winner_key]["team"])
+            winner_db = p2_db if p1_alive == 0 else p1_db
+            
+            # Re-fetch winner DB to get the newly updated stats (including just-added win and elo)
+            winner_db = await db.get_user(battle[winner_key]["id"]) if winner_db else {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
+            
+            winner_card = generate_trainer_card(winner_db, battle[winner_key]["team"])
             await context.bot.send_photo(chat_id=battle["group_chat_id"], reply_to_message_id=battle["group_msg_id"], photo=winner_card, caption=f"🏆 The battle has concluded!\n<b>{winner}</b> defeated <b>{loser}</b> in a 6v6 Showdown!{elo_text}", parse_mode="HTML")
         except Exception: pass
         

@@ -44,9 +44,29 @@ def generate_trainer_card(user_data, team=None):
     username = str(name_str)[:12].upper()
     draw.text((20, 80), f"NAME: {username}", font=title_font, fill="#4a4a4a")
     
+    # Draw Stats on the right side
+    stat_x = 260
+    y_start = 100
+    spacing = 30
+    
+    wins = user_data.get('wins', 0)
+    losses = user_data.get('losses', 0)
+    total_dmg = user_data.get('total_damage', 0)
+    total_battles = wins + losses
+    avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
+    win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
+    dex_seen = len(user_data.get('dex', []))
+    elo = user_data.get('elo', 1000)
+    
+    draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill="#4a4a4a")
+    draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill="#4a4a4a")
+    draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill="#4a4a4a")
+    draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill="#4a4a4a")
+    draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill="#4a4a4a")
+
     if team:
         start_x = 20
-        start_y = 115
+        start_y = 125
         box_w, box_h = 70, 70
         gap = 5
         
@@ -72,24 +92,6 @@ def generate_trainer_card(user_data, team=None):
                     img.paste(sprite_img, (x + 3, y + 3), sprite_img)
                 except Exception as e:
                     pass
-    else:
-        # Draw Stats
-        y_start = 140
-        spacing = 35
-        
-        draw.text((40, y_start), "ELO", font=text_font, fill="#4a4a4a")
-        draw.text((40, y_start + spacing), "WIN/LOSS", font=text_font, fill="#4a4a4a")
-        draw.text((40, y_start + spacing * 2), "AVG DMG", font=text_font, fill="#4a4a4a")
-        
-        wins = user_data.get('wins', 0)
-        losses = user_data.get('losses', 0)
-        total_dmg = user_data.get('total_damage', 0)
-        total_battles = wins + losses
-        avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
-        
-        draw.text((220, y_start), str(user_data.get('elo', 1000)), font=text_font, fill="#4a4a4a")
-        draw.text((220, y_start + spacing), f"{wins} / {losses}", font=text_font, fill="#4a4a4a")
-        draw.text((220, y_start + spacing * 2), str(avg_dmg), font=text_font, fill="#4a4a4a")
     
     # Save to bytes
     bio = io.BytesIO()

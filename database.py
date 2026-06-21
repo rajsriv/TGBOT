@@ -27,7 +27,7 @@ class Database:
         await self.users.insert_one(user)
         return user
 
-    async def update_battle_stats(self, user_id: int, won: bool, damage_dealt: int, elo_change: int):
+    async def update_battle_stats(self, user_id: int, won: bool, damage_dealt: int, elo_change: int, seen_pokemon: list = None):
         # Use $inc to atomically increment stats
         inc_data = {
             "battles_played": 1,
@@ -39,9 +39,13 @@ class Database:
         else:
             inc_data["losses"] = 1
             
+        update_doc = {"$inc": inc_data}
+        if seen_pokemon:
+            update_doc["$addToSet"] = {"dex": {"$each": seen_pokemon}}
+            
         await self.users.update_one(
             {"_id": user_id},
-            {"$inc": inc_data}
+            update_doc
         )
 
 db = Database()
