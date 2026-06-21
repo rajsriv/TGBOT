@@ -421,6 +421,10 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     battle = active_battles[battle_id]
     if query.from_user.id != battle[player_key]["id"]: return
     
+    if query.message.message_id != battle[player_key].get("dm_msg_id"):
+        await query.answer("This message is outdated! Please scroll down to use the newest battle interface.", show_alert=True)
+        return
+    
     pkmn = battle[player_key]["team"][battle[player_key]["active"]]
     if "recharging" in pkmn.get("volatile_status", []) or "charging" in pkmn.get("volatile_status", []):
         await query.answer("Your Pokémon is locked in a move!", show_alert=True)
