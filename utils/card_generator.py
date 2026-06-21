@@ -6,43 +6,48 @@ def generate_trainer_card(user_data, team=None):
     # Dimensions
     WIDTH, HEIGHT = 480, 320
     
+    # Colors
+    BG_BEIGE = "#f8ebd0"
+    BORDER_RED = "#d95c50"
+    TEXT_BLACK = "#1a1a1a"
+    
     # Create base image
-    img = Image.new("RGB", (WIDTH, HEIGHT), "#3bb59b")
+    img = Image.new("RGB", (WIDTH, HEIGHT), BORDER_RED)
     draw = ImageDraw.Draw(img)
     
-    # Draw main card frame
-    # Outer white border
-    draw.rectangle([10, 10, WIDTH-10, HEIGHT-10], fill="#ffffff", outline="#313131", width=2)
+    # Draw inner beige frame
+    draw.rectangle([8, 8, WIDTH-8, HEIGHT-8], fill=BG_BEIGE, outline="#000000", width=2)
     
-    # Top blue header
-    draw.rectangle([12, 12, WIDTH-12, 60], fill="#6b9ced")
-    
-    # Bottom blue header (for badges area)
-    draw.rectangle([12, HEIGHT-60, WIDTH-12, HEIGHT-12], fill="#84b5e8")
+    # Top red header
+    draw.rectangle([12, 12, WIDTH-12, 50], fill=BORDER_RED)
     
     # Load fonts
     font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
     
     try:
-        title_font = ImageFont.truetype(font_path, 24)
-        text_font = ImageFont.truetype(font_path, 16)
-        small_font = ImageFont.truetype(font_path, 12)
+        title_font = ImageFont.truetype(font_path, 20)  # Smaller title
+        text_font = ImageFont.truetype(font_path, 14)   # Smaller text
+        small_font = ImageFont.truetype(font_path, 10)
     except:
         title_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
 
-    # Draw Title
-    draw.text((20, 25), "TRAINER CARD", font=title_font, fill="#f8d868", stroke_width=1, stroke_fill="#4a4a4a")
+    # Draw Title (Center Top, Black)
+    title_text = "TRAINER CARD"
+    # Estimate width to center (since getsize is deprecated, use basic math)
+    # A standard pixel font is roughly 12px per char at size 20
+    title_x = (WIDTH - (len(title_text) * 12)) // 2
+    draw.text((title_x, 20), title_text, font=title_font, fill=TEXT_BLACK)
     
-    # Draw ID (Full ID in bottom bar)
+    # Draw ID (Bottom corner)
     user_id = str(user_data.get('_id', '000000'))
-    draw.text((WIDTH - 250, HEIGHT - 40), f"IDNo.{user_id}", font=text_font, fill="#4a4a4a")
+    draw.text((WIDTH - 150, HEIGHT - 30), f"IDNo.{user_id}", font=small_font, fill=TEXT_BLACK)
     
     # Draw Name (Truncate to 12 chars to prevent overflow)
     name_str = user_data.get('first_name') or user_data.get('username', 'Unknown')
     username = str(name_str)[:12].upper()
-    draw.text((20, 80), f"NAME: {username}", font=title_font, fill="#4a4a4a")
+    draw.text((20, 65), f"NAME: {username}", font=title_font, fill=TEXT_BLACK)
     
     # Draw Stats on the right side
     stat_x = 260
@@ -58,11 +63,11 @@ def generate_trainer_card(user_data, team=None):
     dex_seen = len(user_data.get('dex', []))
     elo = user_data.get('elo', 1000)
     
-    draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill="#4a4a4a")
-    draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill="#4a4a4a")
-    draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill="#4a4a4a")
-    draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill="#4a4a4a")
-    draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill="#4a4a4a")
+    draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
 
     if team:
         start_x = 20
