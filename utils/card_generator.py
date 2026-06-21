@@ -67,31 +67,13 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
     
     # If no opponent team is provided, use the standard layout
     if not opponent_team:
-        # Draw Stats on the right side
-        stat_x = 260
-        y_start = 100
-        spacing = 30
-        
-        wins = user_data.get('wins', 0)
-        losses = user_data.get('losses', 0)
-        total_dmg = user_data.get('total_damage', 0)
-        total_battles = wins + losses
-        avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
-        win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
-        dex_seen = len(user_data.get('dex', []))
-        elo = user_data.get('elo', 1000)
-        
-        draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
-        draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
-        draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
-        draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
-        draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
-
-        if team:
-            start_x = 20
-            start_y = 125
-            box_w, box_h = 70, 70
-            gap = 5
+        if card_type == "BATTLE" and team:
+            # Draw team grid centered and larger
+            box_w, box_h = 80, 80
+            gap = 10
+            total_w = (3 * box_w) + (2 * gap)
+            start_x = (WIDTH - total_w) // 2
+            start_y = 110
             
             for i, pkmn in enumerate(team):
                 if i >= 6: break
@@ -105,15 +87,63 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                 if "sprite" in pkmn and pkmn["sprite"]:
                     try:
                         sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
-                        sprite_img = sprite_img.resize((64, 64), Image.NEAREST)
+                        sprite_img = sprite_img.resize((72, 72), Image.NEAREST)
                         
                         if pkmn.get("hp", 1) <= 0:
                             la = sprite_img.convert("LA")
                             sprite_img = la.convert("RGBA")
                             
-                        img.paste(sprite_img, (x + 3, y + 3), sprite_img)
+                        img.paste(sprite_img, (x + 4, y + 4), sprite_img)
                     except Exception as e:
                         pass
+        else:
+            # Draw Stats on the right side
+            stat_x = 260
+            y_start = 100
+            spacing = 30
+            
+            wins = user_data.get('wins', 0)
+            losses = user_data.get('losses', 0)
+            total_dmg = user_data.get('total_damage', 0)
+            total_battles = wins + losses
+            avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
+            win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
+            dex_seen = len(user_data.get('dex', []))
+            elo = user_data.get('elo', 1000)
+            
+            draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
+            draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
+            draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
+            draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
+            draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
+    
+            if team:
+                start_x = 20
+                start_y = 125
+                box_w, box_h = 70, 70
+                gap = 5
+                
+                for i, pkmn in enumerate(team):
+                    if i >= 6: break
+                    row = i // 3
+                    col = i % 3
+                    x = start_x + col * (box_w + gap)
+                    y = start_y + row * (box_h + gap)
+                    
+                    draw.rectangle([x, y, x + box_w, y + box_h], outline="#313131", fill="#ffffff", width=2)
+                    
+                    if "sprite" in pkmn and pkmn["sprite"]:
+                        try:
+                            sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
+                            sprite_img = sprite_img.resize((64, 64), Image.NEAREST)
+                            
+                            if pkmn.get("hp", 1) <= 0:
+                                la = sprite_img.convert("LA")
+                                sprite_img = la.convert("RGBA")
+                                
+                            img.paste(sprite_img, (x + 3, y + 3), sprite_img)
+                        except Exception as e:
+                            pass
         else:
             # Draw a big Pokeball in the empty space on the left
             pb_x = 55
