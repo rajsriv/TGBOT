@@ -806,6 +806,36 @@ async def resolve_turn(battle_id, context, query):
                         if actual_dmg > 0 and not hit_substitute:
                             hit_msg = execute_ability_hook("on_hit_receive", def_pkmn["ability"], move=move, atk_pkmn=atk_pkmn)
                             if hit_msg: action_text += hit_msg
+                            
+                            # Draining Moves
+                            draining_moves = ["giga drain", "drain punch", "horn leech", "absorb", "mega drain", "leech life", "oblivion wing", "parabolic charge"]
+                            if move["name"].lower() in draining_moves:
+                                if def_pkmn["ability"] == "Liquid Ooze":
+                                    ooze_dmg = max(1, actual_dmg // 2)
+                                    atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - ooze_dmg)
+                                    action_text += f"💧 {atk_pkmn['name']} sucked up the liquid ooze and was hurt! (-{ooze_dmg} HP)\n"
+                                else:
+                                    heal = max(1, actual_dmg // 2)
+                                    if atk_pkmn["hp"] < atk_pkmn["max_hp"]:
+                                        atk_pkmn["hp"] = min(atk_pkmn["max_hp"], atk_pkmn["hp"] + heal)
+                                        action_text += f"🌿 {atk_pkmn['name']} had its HP restored! (+{heal} HP)\n"
+                                        
+                            # Recoil Moves
+                            recoil_moves_33 = ["flare blitz", "double-edge", "brave bird", "wood hammer", "wild charge", "volt tackle"]
+                            recoil_moves_25 = ["take down", "submission"]
+                            recoil_moves_50 = ["head smash", "light of ruin"]
+                            
+                            m_name = move["name"].lower()
+                            recoil_frac = 0
+                            if m_name in recoil_moves_33: recoil_frac = 1/3
+                            elif m_name in recoil_moves_25: recoil_frac = 1/4
+                            elif m_name in recoil_moves_50: recoil_frac = 1/2
+                            
+                            if recoil_frac > 0:
+                                if atk_pkmn["ability"] != "Rock Head":
+                                    recoil_dmg = max(1, int(actual_dmg * recoil_frac))
+                                    atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - recoil_dmg)
+                                    action_text += f"💥 {atk_pkmn['name']} was damaged by the recoil! (-{recoil_dmg} HP)\n"
                 
                 if move["power"] == 0:
                     m_name = move["name"].lower()
