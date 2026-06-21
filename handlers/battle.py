@@ -670,12 +670,19 @@ async def resolve_turn(battle_id, context, query):
                         atk_pkmn["choice_locked"] = choice["index"]
                 
                 if move["name"].lower() in ["protect", "detect"]:
-                    if "protect" not in atk_pkmn.get("volatile_status", []):
-                        atk_pkmn.setdefault("volatile_status", []).append("protect")
+                    success_rate = 100 // (2 ** atk_pkmn.get("protect_counter", 0))
+                    
+                    if random.randint(1, 100) <= success_rate:
+                        if "protect" not in atk_pkmn.get("volatile_status", []):
+                            atk_pkmn.setdefault("volatile_status", []).append("protect")
+                        atk_pkmn["protect_counter"] = atk_pkmn.get("protect_counter", 0) + 1
                         action_text += f"🛡️ {atk_pkmn['name']} protected itself!\n"
                     else:
+                        atk_pkmn["protect_counter"] = 0
                         action_text += f"💥 {atk_pkmn['name']}'s {move['name']} failed!\n"
                     continue
+                else:
+                    atk_pkmn["protect_counter"] = 0
                     
                 # Defender is protecting or invulnerable?
                 if "protect" in def_pkmn.get("volatile_status", []):
