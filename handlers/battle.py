@@ -91,7 +91,11 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p2": {"id": None, "name": target_username, "tag": target_username.replace("@", ""), "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "choices": {"p1": None, "p2": None},
         "menus": {"p1": "main", "p2": "main"},
-        "spectators": {}
+        "spectators": {},
+        "hazards": {
+            "p1": {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False},
+            "p2": {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False}
+        }
     }
 
     bot_username = context.bot.username
@@ -445,6 +449,46 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await sync_battle_state(battle_id, context)
     else: await sync_battle_state(battle_id, context)
 
+def apply_hazards(battle, p_key, pkmn):
+    hazards = battle["hazards"][p_key]
+    text = ""
+    is_grounded = "flying" not in pkmn["types"] and pkmn["ability"] != "Levitate"
+    
+    if hazards["stealth_rock"]:
+        from engine import get_type_multiplier
+        weakness = get_type_multiplier("rock", pkmn["types"])
+        dmg = max(1, int((pkmn["max_hp"] / 8) * weakness))
+        pkmn["hp"] = max(0, pkmn["hp"] - dmg)
+        text += f"🪨 Pointed stones dug into {pkmn['name']}! (-{dmg} HP)\n"
+        
+    if pkmn["hp"] <= 0: return text
+        
+    if is_grounded:
+        if hazards["spikes"] > 0:
+            dmg_frac = [8, 6, 4][hazards["spikes"] - 1]
+            dmg = max(1, int(pkmn["max_hp"] / dmg_frac))
+            pkmn["hp"] = max(0, pkmn["hp"] - dmg)
+            text += f"🪡 {pkmn['name']} was hurt by the Spikes!\n"
+            
+        if pkmn["hp"] <= 0: return text
+            
+        if hazards["toxic_spikes"] > 0:
+            if "poison" in pkmn["types"]:
+                hazards["toxic_spikes"] = 0
+                text += f"🧹 {pkmn['name']} absorbed the Toxic Spikes!\n"
+            elif "steel" not in pkmn["types"] and not pkmn.get("status"):
+                pkmn["status"] = "poisoned"
+                text += f"☠️ {pkmn['name']} was poisoned by the Toxic Spikes!\n"
+                
+        if hazards["sticky_web"]:
+            old_stage = pkmn["stat_stages"].get("spd", 0)
+            new_stage = max(-6, old_stage - 1)
+            if new_stage < old_stage:
+                pkmn["stat_stages"]["spd"] = new_stage
+                text += f"🕸️ {pkmn['name']} was caught in a Sticky Web! Its Speed fell!\n"
+                
+    return text
+
 async def resolve_turn(battle_id, context, query):
     battle = active_battles[battle_id]
     is_force_switch = battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch"
@@ -455,9 +499,14 @@ async def resolve_turn(battle_id, context, query):
             if battle["menus"][p_key] == "force_switch" and battle["choices"][p_key]:
                 choice = battle["choices"][p_key]
                 battle[p_key]["active"] = choice["index"]
-                pkmn_name = battle[p_key]["team"][choice["index"]]["name"]
-                action_text += f"🔄 {battle[p_key]['name']} sent out {pkmn_name}!\n"
-                battle["menus"][p_key] = "main"
+                pkmn = battle[p_key]["team"][choice["index"]]
+                action_text += f"🔄 {battle[p_key]['name']} sent out {pkmn['name']}!\n"
+                action_text += apply_hazards(battle, p_key, pkmn)
+                if pkmn["hp"] <= 0:
+                    action_text += f"💀 {pkmn['name']} fainted immediately upon switching in!\n"
+                    # Stays in force switch menu
+                else:
+                    battle["menus"][p_key] = "main"
         battle["choices"] = {"p1": None, "p2": None}
     else:
         actions = []
@@ -493,8 +542,12 @@ async def resolve_turn(battle_id, context, query):
             if choice["type"] == "switch":
                 old_name = player["team"][player["active"]]["name"]
                 player["active"] = choice["index"]
-                new_name = player["team"][choice["index"]]["name"]
-                action_text += f"🔄 {player['name']} withdrew {old_name} and sent out {new_name}!\n"
+                new_pkmn = player["team"][choice["index"]]
+                action_text += f"🔄 {player['name']} withdrew {old_name} and sent out {new_pkmn['name']}!\n"
+                action_text += apply_hazards(battle, p_key, new_pkmn)
+                if new_pkmn["hp"] <= 0:
+                    action_text += f"💀 {new_pkmn['name']} fainted immediately upon switching in!\n"
+                    battle["menus"][p_key] = "force_switch"
             elif choice["type"] == "move":
                 atk_pkmn, def_pkmn = player["team"][player["active"]], opponent["team"][opponent["active"]]
                 move = atk_pkmn["moves"][choice["index"]]
@@ -706,6 +759,34 @@ async def resolve_turn(battle_id, context, query):
                         battle["weather"] = "hail"
                         battle["weather_turns"] = 5
                         action_text += "🌨️ It started to hail!\n"
+                    elif m_name == "stealth rock":
+                        if not battle["hazards"][opponent_key]["stealth_rock"]:
+                            battle["hazards"][opponent_key]["stealth_rock"] = True
+                            action_text += f"🪨 Pointed stones float in the air around {opponent['name']}'s team!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "spikes":
+                        if battle["hazards"][opponent_key]["spikes"] < 3:
+                            battle["hazards"][opponent_key]["spikes"] += 1
+                            action_text += f"🪡 Spikes were scattered all around the feet of {opponent['name']}'s team!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "toxic spikes":
+                        if battle["hazards"][opponent_key]["toxic_spikes"] < 2:
+                            battle["hazards"][opponent_key]["toxic_spikes"] += 1
+                            action_text += f"☠️ Poison spikes were scattered all around the feet of {opponent['name']}'s team!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "sticky web":
+                        if not battle["hazards"][opponent_key]["sticky_web"]:
+                            battle["hazards"][opponent_key]["sticky_web"] = True
+                            action_text += f"🕸️ A sticky web spreads out on the ground around {opponent['name']}'s team!\n"
+                        else: action_text += "But it failed!\n"
+                    elif m_name == "defog":
+                        battle["hazards"]["p1"] = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False}
+                        battle["hazards"]["p2"] = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False}
+                        action_text += "💨 A strong wind blew away all entry hazards!\n"
+                
+                if move["power"] > 0 and move["name"].lower() == "rapid spin":
+                    battle["hazards"][p_key] = {"stealth_rock": False, "spikes": 0, "toxic_spikes": 0, "sticky_web": False}
+                    action_text += f"🌀 {atk_pkmn['name']} blew away the hazards on its side!\n"
                 
                 # Apply Stat Changes
                 for sc in move.get("stat_changes", []):
