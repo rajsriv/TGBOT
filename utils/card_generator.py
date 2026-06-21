@@ -35,9 +35,12 @@ def generate_trainer_card(user_data, team=None):
 
     # Draw Title (Center Top, Black)
     title_text = "TRAINER CARD"
-    # Estimate width to center (since getsize is deprecated, use basic math)
-    # A standard pixel font is roughly 12px per char at size 20
-    title_x = (WIDTH - (len(title_text) * 12)) // 2
+    try:
+        title_width = draw.textlength(title_text, font=title_font)
+    except AttributeError:
+        title_width = title_font.getsize(title_text)[0] if hasattr(title_font, 'getsize') else len(title_text) * 12
+        
+    title_x = (WIDTH - title_width) / 2
     draw.text((title_x, 20), title_text, font=title_font, fill=TEXT_BLACK)
     
     # Draw ID (Bottom corner)
