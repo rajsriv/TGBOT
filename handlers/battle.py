@@ -90,7 +90,8 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "p1": {"id": challenger.id, "name": challenger.first_name, "tag": challenger.username, "team": p1_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "p2": {"id": None, "name": target_username, "tag": target_username.replace("@", ""), "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0},
         "choices": {"p1": None, "p2": None},
-        "menus": {"p1": "main", "p2": "main"}
+        "menus": {"p1": "main", "p2": "main"},
+        "spectators": {}
     }
 
     bot_username = context.bot.username
@@ -120,7 +121,11 @@ async def join_battle(update: Update, context: ContextTypes.DEFAULT_TYPE, battle
     elif user.id == battle["p2"]["id"]: player_key = "p2"
         
     if not player_key:
-        await update.message.reply_text("You are not a participant in this battle!")
+        if "spectators" not in battle: battle["spectators"] = {}
+        battle["spectators"][user.id] = {"dm_chat_id": update.message.chat_id, "dm_msg_id": None}
+        dm_msg = await update.message.reply_text(f"👁️ You are now spectating {battle['p1']['name']} vs {battle['p2']['name']}!")
+        battle["spectators"][user.id]["dm_msg_id"] = dm_msg.message_id
+        await update_spectator_dm(battle_id, context, user.id)
         return
         
     user_db = await db.get_user(user.id)
@@ -218,6 +223,11 @@ async def sync_battle_state(battle_id, context):
                 try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=win_text, parse_mode="HTML")
                 except Exception: pass
                 
+        for spec_id, spec_data in battle.get("spectators", {}).items():
+            if spec_data["dm_chat_id"]:
+                try: await context.bot.edit_message_text(chat_id=spec_data["dm_chat_id"], message_id=spec_data["dm_msg_id"], text=win_text, parse_mode="HTML")
+                except Exception: pass
+                
         try:
             winner_key = "p2" if p1_alive == 0 else "p1"
             winner_db = p2_db if p1_alive == 0 else p1_db
@@ -245,6 +255,8 @@ async def sync_battle_state(battle_id, context):
 
     await update_player_dm(battle_id, context, "p1")
     await update_player_dm(battle_id, context, "p2")
+    for spec_id in battle.get("spectators", {}).keys():
+        await update_spectator_dm(battle_id, context, spec_id)
 
 async def update_player_dm(battle_id, context, player_key):
     battle = active_battles[battle_id]
@@ -302,8 +314,48 @@ async def update_player_dm(battle_id, context, player_key):
     
     try: await context.bot.edit_message_caption(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], caption=text, reply_markup=reply_markup)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"Failed to edit dm message: {e}")
+        import asyncio
+        for pkmn in me["team"]: pkmn["hp"] = 0
+        battle["action_text"] = f"🏳️ {me['name']} abandoned the battle! (Message deleted or Bot blocked)"
+        asyncio.create_task(sync_battle_state(battle_id, context))
+
+async def update_spectator_dm(battle_id, context, spec_id):
+    if battle_id not in active_battles: return
+    battle = active_battles[battle_id]
+    spec = battle.get("spectators", {}).get(spec_id)
+    if not spec or not spec["dm_chat_id"]: return
+    
+    p1 = battle["p1"]
+    p2 = battle["p2"]
+    
+    text = f"👁️ <b>Spectating: {p1['name']} vs {p2['name']}</b>\n\n"
+    if battle["action_text"]: text += f"{battle['action_text']}\n\n"
+    
+    for pk, name in [("p1", p1['name']), ("p2", p2['name'])]:
+        player = battle[pk]
+        if not player["team"]: continue
+        active = player["team"][player["active"]]
+        alive = sum(1 for p in player["team"] if p["hp"] > 0)
+        hp_pct = active['hp'] / active['max_hp']
+        bars = max(1, int(round(hp_pct * 10))) if active['hp'] > 0 else 0
+        hp_bar = "▓" * bars + "░" * (10 - bars)
+        status = f" [{active['status'].upper()}]" if active.get("status") else ""
+        
+        text += (
+            f"<b>{name}'s Team:</b>\n"
+            f"{hp_bar} {int(hp_pct * 100)}% HP\n"
+            f"▙ {active['name']}{status} (Poké: {alive}/6)\n\n"
+        )
+        
+    thinking = []
+    if battle["choices"]["p1"] is None and len(get_player_buttons(battle, "p1", battle_id)) > 0: thinking.append(p1["name"])
+    if battle["choices"]["p2"] is None and len(get_player_buttons(battle, "p2", battle_id)) > 0: thinking.append(p2["name"])
+    
+    if len(thinking) == 2: text += f"■ Both players making choices..."
+    elif len(thinking) == 1: text += f"Waiting for {thinking[0]}..."
+    
+    try: await context.bot.edit_message_text(chat_id=spec["dm_chat_id"], message_id=spec["dm_msg_id"], text=text, parse_mode="HTML")
+    except Exception: pass
 
 async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
