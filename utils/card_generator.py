@@ -55,15 +55,16 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
     title_x = (WIDTH - title_width) / 2
     draw.text((title_x, 20), title_text, font=title_font, fill=TEXT_BLACK)
     
-    # Draw ID (Bottom corner)
-    user_id = str(user_data.get('_id', '000000'))
-    # Use a wider margin from the right edge to prevent overflow
-    draw.text((WIDTH - 200, HEIGHT - 30), f"IDNo.{user_id}", font=small_font, fill=TEXT_BLACK)
-    
-    # Draw Name (Truncate to 12 chars to prevent overflow)
     name_str = user_data.get('first_name') or user_data.get('username', 'Unknown')
     username = str(name_str)[:12].upper()
-    draw.text((20, 65), f"NAME: {username}", font=title_font, fill=TEXT_BLACK)
+    
+    if card_type != "RESULT":
+        # Draw ID (Bottom corner)
+        user_id = str(user_data.get('_id', '000000'))
+        draw.text((WIDTH - 200, HEIGHT - 30), f"IDNo.{user_id}", font=small_font, fill=TEXT_BLACK)
+        
+        # Draw Name
+        draw.text((20, 65), f"NAME: {username}", font=title_font, fill=TEXT_BLACK)
     
     # If no opponent team is provided, use the standard layout
     if not opponent_team:
