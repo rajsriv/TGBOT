@@ -389,6 +389,9 @@ async def resolve_turn(battle_id, context, query):
             base_spd = pkmn["stats"]["spd"] * get_stat_multiplier(pkmn["stat_stages"].get("spd", 0))
             if pkmn.get("status") == "paralyzed": base_spd *= 0.5
             
+            if battle.get("trick_room", 0) > 0:
+                base_spd = 10000 - base_spd
+            
             prio = base_spd + random.uniform(0, 0.99)
             if c["type"] == "move":
                 move_name = pkmn["moves"][c["index"]]["name"].lower()
@@ -396,6 +399,8 @@ async def resolve_turn(battle_id, context, query):
                     prio += 10000
                 elif move_name in ["fake out", "extreme speed", "quick attack", "mach punch", "bullet punch", "ice shard", "aqua jet", "sucker punch"]:
                     prio += 5000
+                elif move_name == "trick room":
+                    prio -= 10000
             return prio
             
         actions.sort(key=priority, reverse=True)
@@ -443,6 +448,16 @@ async def resolve_turn(battle_id, context, query):
                     
                 if move["name"].lower() == "steel roller":
                     action_text += f"{atk_pkmn['name']} tried to use Steel Roller, but it failed without Terrain!\n"
+                    continue
+                    
+                if move["name"].lower() == "trick room":
+                    move["pp"] -= 1
+                    if battle.get("trick_room", 0) > 0:
+                        battle["trick_room"] = 0
+                        action_text += f"✨ {atk_pkmn['name']} used Trick Room!\nThe twisted dimensions returned to normal!\n"
+                    else:
+                        battle["trick_room"] = 5
+                        action_text += f"✨ {atk_pkmn['name']} used Trick Room!\nThe dimensions were twisted!\n"
                     continue
                     
                 # Charging Moves
@@ -658,6 +673,11 @@ async def resolve_turn(battle_id, context, query):
         battle["choices"] = {"p1": None, "p2": None}
         
         # End of turn effects
+        if battle.get("trick_room", 0) > 0:
+            battle["trick_room"] -= 1
+            if battle["trick_room"] == 0:
+                action_text += "The twisted dimensions returned to normal!\n"
+                
         for p_key in ["p1", "p2"]:
             active = battle[p_key]["team"][battle[p_key]["active"]]
             
