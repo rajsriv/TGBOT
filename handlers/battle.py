@@ -315,7 +315,10 @@ async def update_player_dm(battle_id, context, player_key):
     try: await context.bot.edit_message_caption(chat_id=me["dm_chat_id"], message_id=me["dm_msg_id"], caption=text, reply_markup=reply_markup)
     except Exception as e:
         import asyncio
-        for pkmn in me["team"]: pkmn["hp"] = 0
+        for pkmn in me["team"]:
+            if pkmn["hp"] > 0:
+                opp["damage_dealt"] += pkmn["hp"]
+                pkmn["hp"] = 0
         battle["action_text"] = f"🏳️ {me['name']} abandoned the battle! (Message deleted or Bot blocked)"
         asyncio.create_task(sync_battle_state(battle_id, context))
 
@@ -384,8 +387,11 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if action_type == "menu":
         if action_val == "resign":
+            opponent_key = "p2" if player_key == "p1" else "p1"
             for pkmn in battle[player_key]["team"]:
-                pkmn["hp"] = 0
+                if pkmn["hp"] > 0:
+                    battle[opponent_key]["damage_dealt"] += pkmn["hp"]
+                    pkmn["hp"] = 0
             battle["action_text"] = f"{battle[player_key]['name']} forfeited the match!"
             await sync_battle_state(battle_id, context)
             await query.answer("You resigned.")
