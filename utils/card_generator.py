@@ -115,7 +115,8 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
             draw.text((stat_x, y_start), f"ELO: {elo}", font=text_font, fill=TEXT_BLACK)
             draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
             draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
-            draw.text((stat_x, y_start + spacing * 3), f"W/L: {wins}W - {losses}L", font=text_font, fill=TEXT_BLACK)
+            kd_ratio = f"{(wins / losses):.2f}" if losses > 0 else f"{wins:.2f}"
+            draw.text((stat_x, y_start + spacing * 3), f"K/D: {kd_ratio}", font=text_font, fill=TEXT_BLACK)
             draw.text((stat_x, y_start + spacing * 4), f"WIN RATE: {win_rate}%", font=text_font, fill=TEXT_BLACK)
     
             if team:
