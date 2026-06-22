@@ -60,7 +60,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
         p1_team = await fetch_random_team(gen=gen_choice)
         p2_team = await fetch_random_team(gen=gen_choice)
         
-        battle_id = f"b_ai_{query.message.message_id}"
+        battle_id = f"bai_{query.message.message_id}"
         
         bot_personalities = ["Aggressive", "Defensive", "Balanced"]
         bot_personality = random.choice(bot_personalities)
@@ -106,7 +106,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
         p1_team = await fetch_random_team(gen=gen_choice)
         p2_team = await fetch_random_team(gen=gen_choice)
         
-        battle_id = f"b_ai_{query.message.message_id}"
+        battle_id = f"bai_{query.message.message_id}"
         
         bot_personalities = ["Aggressive", "Defensive", "Balanced"]
         bot_personality = random.choice(bot_personalities)
