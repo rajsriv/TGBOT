@@ -6,8 +6,16 @@ from utils.formulas import calc_stat, roll_ivs
 import json
 import os
 
-with open("data/gen4randombattle.json", "r") as f:
-    RANDBATS_DATA = json.load(f)
+RANDBATS_CACHE = {}
+
+def get_randbats_data(gen):
+    if gen not in RANDBATS_CACHE:
+        path = f"data/{gen}randombattle.json"
+        if not os.path.exists(path):
+            path = "data/gen4randombattle.json" # fallback
+        with open(path, "r") as f:
+            RANDBATS_CACHE[gen] = json.load(f)
+    return RANDBATS_CACHE[gen]
 
 def get_random_battle_level(bst):
     if bst >= 680: return 72
@@ -17,15 +25,16 @@ def get_random_battle_level(bst):
     if bst >= 300: return 94
     return 100
 
-async def fetch_random_team(size=6, level=None):
-    tasks = [fetch_random_pokemon(level) for _ in range(size)]
+async def fetch_random_team(size=6, level=None, gen="gen4"):
+    tasks = [fetch_random_pokemon(level, gen) for _ in range(size)]
     return await asyncio.gather(*tasks)
 
-async def fetch_random_pokemon(level: int = None):
+async def fetch_random_pokemon(level: int = None, gen: str = "gen4"):
+    randbats_data = get_randbats_data(gen)
     async with httpx.AsyncClient() as client:
         while True:
-            pkmn_name = random.choice(list(RANDBATS_DATA.keys()))
-            randbats_pkmn = RANDBATS_DATA[pkmn_name]
+            pkmn_name = random.choice(list(randbats_data.keys()))
+            randbats_pkmn = randbats_data[pkmn_name]
             
             # Format name for PokeAPI
             api_name = pkmn_name.lower().replace(" ", "-").replace(".", "").replace("'", "")

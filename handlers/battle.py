@@ -233,8 +233,12 @@ async def sync_battle_state(battle_id, context):
         p1_db = await db.get_user(battle["p1"]["id"])
         p2_db = await db.get_user(battle["p2"]["id"])
         
+        if battle.get("is_ranked", True):
+            if battle["p2"].get("is_bot") and p1_db:
+                p2_db = {"elo": p1_db.get("elo", 1000)}
+                
         elo_text = ""
-        if p1_db and p2_db:
+        if p1_db and p2_db and battle.get("is_ranked", True):
             p1_elo = p1_db.get("elo", 1000)
             p2_elo = p2_db.get("elo", 1000)
             
@@ -249,27 +253,30 @@ async def sync_battle_state(battle_id, context):
             p2_seen = p1_seen
             
             await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change, p1_seen)
-            await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change, p2_seen)
+            if not battle["p2"].get("is_bot"):
+                await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change, p2_seen)
             
-            elo_text = f"\n\n📈 {battle['p1']['name']}: {p1_elo_change:+d} Elo\n📉 {battle['p2']['name']}: {p2_elo_change:+d} Elo"
+            elo_text = f"\n\n📈 {battle['p1']['name']}: {p1_elo_change:+d} Elo"
+            if not battle["p2"].get("is_bot"): elo_text += f"\n📉 {battle['p2']['name']}: {p2_elo_change:+d} Elo"
             win_text += elo_text
         
         for p_key in ["p1", "p2"]:
-            if battle[p_key]["dm_chat_id"]:
+            if battle[p_key].get("dm_chat_id"):
                 try: await context.bot.edit_message_caption(chat_id=battle[p_key]["dm_chat_id"], message_id=battle[p_key]["dm_msg_id"], caption=win_text, parse_mode="HTML")
                 except Exception: pass
                 
         for spec_id, spec_data in battle.get("spectators", {}).items():
-            if spec_data["dm_chat_id"]:
+            if spec_data.get("dm_chat_id"):
                 try: await context.bot.edit_message_text(chat_id=spec_data["dm_chat_id"], message_id=spec_data["dm_msg_id"], text=win_text, parse_mode="HTML")
                 except Exception: pass
                 
         try:
             winner_key = "p2" if p1_alive == 0 else "p1"
-            winner_db = p2_db if p1_alive == 0 else p1_db
             
-            # Re-fetch winner DB to get the newly updated stats (including just-added win and elo)
-            winner_db = await db.get_user(battle[winner_key]["id"]) if winner_db else {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
+            if battle[winner_key].get("is_bot"):
+                winner_db = {"_id": -1, "username": battle[winner_key]["name"], "elo": 1000}
+            else:
+                winner_db = await db.get_user(battle[winner_key]["id"]) if await db.get_user(battle[winner_key]["id"]) else {"_id": battle[winner_key]["id"], "username": battle[winner_key]["name"]}
             
             winner_db["first_name"] = battle[winner_key]["name"]
             loser_key = "p1" if winner_key == "p2" else "p2"
@@ -459,6 +466,11 @@ async def handle_move_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             
     battle["choices"][player_key] = {"type": action_type, "index": int(action_val)}
     await query.answer("Locked in!")
+
+    if battle["p2"].get("is_bot") and battle["choices"]["p2"] is None:
+        from bot_ai import get_bot_action
+        action = get_bot_action(battle, "p2", battle["p2"]["personality"])
+        if action: battle["choices"]["p2"] = action
 
     ready = True
     for p_key in ["p1", "p2"]:
@@ -1329,10 +1341,23 @@ async def resolve_turn(battle_id, context, query):
             elif "recharging" in pkmn.get("volatile_status", []):
                 battle["choices"][p_key] = {"type": "recharge"}
                 
+    if battle["p2"].get("is_bot") and battle["choices"]["p2"] is None:
+        from bot_ai import get_bot_action
+        action = get_bot_action(battle, "p2", battle["p2"]["personality"])
+        if action: battle["choices"]["p2"] = action
+                
     reset_timeout(context, battle_id)
     battle["action_text"] = action_text
     await sync_battle_state(battle_id, context)
     
     # Check if both players are locked into next turn!
-    if not is_fs and battle["choices"]["p1"] is not None and battle["choices"]["p2"] is not None:
+    ready = True
+    for p_key in ["p1", "p2"]:
+        opponent_key = "p2" if p_key == "p1" else "p1"
+        if battle["menus"][opponent_key] == "force_switch" and battle["menus"][p_key] != "force_switch": continue
+        if battle["choices"][p_key] is None:
+            ready = False
+            break
+
+    if ready and (battle["choices"]["p1"] is not None or battle["choices"]["p2"] is not None):
         context.job_queue.run_once(auto_resolve_job, 2.5, data=battle_id)
