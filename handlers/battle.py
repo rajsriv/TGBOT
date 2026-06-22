@@ -545,7 +545,7 @@ async def resolve_turn(battle_id, context, query):
                 choice = battle["choices"][p_key]
                 
                 old_pkmn = battle[p_key]["team"][battle[p_key]["active"]]
-                old_pkmn["stat_stages"] = {}
+                old_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0, "accuracy": 0, "evasion": 0}
                 old_pkmn["volatile_status"] = []
                 old_pkmn["protect_counter"] = 0
                 if "choice_locked" in old_pkmn: del old_pkmn["choice_locked"]
@@ -612,7 +612,7 @@ async def resolve_turn(battle_id, context, query):
             if choice["type"] == "switch":
                 old_pkmn = player["team"][player["active"]]
                 old_pkmn["toxic_turns"] = 1
-                old_pkmn["stat_stages"] = {}
+                old_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0, "accuracy": 0, "evasion": 0}
                 old_pkmn["volatile_status"] = []
                 old_pkmn["protect_counter"] = 0
                 if "choice_locked" in old_pkmn: del old_pkmn["choice_locked"]
@@ -1119,7 +1119,7 @@ async def resolve_turn(battle_id, context, query):
                                 def_pkmn["toxic_turns"] = 1
                                 if "choice_locked" in def_pkmn: del def_pkmn["choice_locked"]
                                 def_pkmn["volatile_status"] = [] # Clear volatile status
-                                def_pkmn["stat_stages"] = {}
+                                def_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0, "accuracy": 0, "evasion": 0}
                                 def_pkmn["protect_counter"] = 0
                                 
                                 action_text += f"🌪️ {old_name} was blown away! {new_pkmn['name']} was dragged out!\n"
@@ -1202,7 +1202,7 @@ async def resolve_turn(battle_id, context, query):
                         # Note: Choice Lock is reset on switch in another part of the code,
                         # but we can reset volatile statuses here just in case.
                         atk_pkmn["volatile_status"] = []
-                        atk_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0}
+                        atk_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0, "accuracy": 0, "evasion": 0}
             elif choice["type"] == "recharge":
                 atk_pkmn = player["team"][player["active"]]
                 action_text += f"💤 {atk_pkmn['name']} must recharge!\n"
