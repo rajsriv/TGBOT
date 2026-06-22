@@ -1,4 +1,5 @@
 import random
+from utils.type_chart import get_type_multiplier
 
 def get_bot_action(battle, bot_key, personality="Balanced"):
     """
@@ -43,18 +44,22 @@ def get_bot_action(battle, bot_key, personality="Balanced"):
             if personality == "Defensive" and hp_pct < 0.3 and random.random() < 0.6:
                 return {"type": "switch", "index": random.choice(available_switches)}
 
-        available_moves = list(range(len(bot_active["moves"])))
+        available_moves = [i for i in range(len(bot_active["moves"])) if bot_active["moves"][i].get("pp", 1) > 0]
         if locked_move is not None and locked_move < len(bot_active["moves"]):
-            available_moves = [locked_move]
+            if bot_active["moves"][locked_move].get("pp", 1) > 0:
+                available_moves = [locked_move]
+            else:
+                available_moves = [] # Forces Struggle if locked into 0 PP move
             
         if not available_moves:
-            return {"type": "move", "index": 0}
+            return {"type": "move", "index": 0} # Struggle fallback
             
         if personality == "Aggressive":
             def move_score(idx):
                 m = bot_active["moves"][idx]
                 score = m.get("power", 0)
                 if m["type"] in bot_active["types"]: score *= 1.5
+                score *= get_type_multiplier(m["type"], opp_active["types"])
                 return score
             best_move = max(available_moves, key=move_score)
             return {"type": "move", "index": best_move}
@@ -63,13 +68,22 @@ def get_bot_action(battle, bot_key, personality="Balanced"):
             def move_score(idx):
                 m = bot_active["moves"][idx]
                 if m.get("power", 0) == 0: return 100
-                return m.get("power", 0)
+                score = m.get("power", 0)
+                score *= get_type_multiplier(m["type"], opp_active["types"])
+                return score
             best_move = max(available_moves, key=move_score)
             if random.random() < 0.3:
                 return {"type": "move", "index": random.choice(available_moves)}
             return {"type": "move", "index": best_move}
             
         else:
-            return {"type": "move", "index": random.choice(available_moves)}
+            def move_score(idx):
+                m = bot_active["moves"][idx]
+                score = m.get("power", 0)
+                if m["type"] in bot_active["types"]: score *= 1.5
+                score *= get_type_multiplier(m["type"], opp_active["types"])
+                return score + random.uniform(0, 50)
+            best_move = max(available_moves, key=move_score)
+            return {"type": "move", "index": best_move}
             
     return None
