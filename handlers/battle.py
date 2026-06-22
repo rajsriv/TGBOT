@@ -1179,6 +1179,18 @@ async def resolve_turn(battle_id, context, query):
                 if def_pkmn["hp"] == 0:
                     action_text += f"💀 {def_pkmn['name']} fainted!\n"
                     battle["menus"]["p2" if p_key == "p1" else "p1"] = "force_switch"
+                
+                # U-Turn, Volt Switch, etc. (Pivot moves)
+                if move["name"].lower() in ["u-turn", "volt switch", "flip turn", "parting shot", "teleport", "baton pass"]:
+                    alive_count = sum(1 for p in player["team"] if p["hp"] > 0 and p != atk_pkmn)
+                    if alive_count > 0 and atk_pkmn["hp"] > 0:
+                        action_text += f"🏃 {atk_pkmn['name']} went back to {player['name']}!\n"
+                        battle["menus"][p_key] = "force_switch"
+                        
+                        # Note: Choice Lock is reset on switch in another part of the code,
+                        # but we can reset volatile statuses here just in case.
+                        atk_pkmn["volatile_status"] = []
+                        atk_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0}
             elif choice["type"] == "recharge":
                 atk_pkmn = player["team"][player["active"]]
                 action_text += f"💤 {atk_pkmn['name']} must recharge!\n"
