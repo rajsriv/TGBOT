@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import db
 from handlers.battle import active_battles, fetch_random_team, sync_battle_state, reset_timeout
-from utils.images import generate_trainer_card
+from utils.card_generator import generate_trainer_card
 import random
 
 async def match_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
