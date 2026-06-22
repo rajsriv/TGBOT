@@ -46,7 +46,6 @@ async def auto_resolve_job(context: ContextTypes.DEFAULT_TYPE):
     battle_id = context.job.data
     if battle_id not in active_battles: return
     battle = active_battles[battle_id]
-    if battle["menus"]["p1"] == "force_switch" or battle["menus"]["p2"] == "force_switch": return
     
     for p_key in ["p1", "p2"]:
         pkmn = battle[p_key]["team"][battle[p_key]["active"]]
