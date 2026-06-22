@@ -62,8 +62,13 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         battle_id = f"bai_{query.message.message_id}"
         
-        bot_personalities = ["Aggressive", "Defensive", "Balanced"]
-        bot_personality = random.choice(bot_personalities)
+        bot_personalities = {
+            "Aggressive": ["Rival Blue", "Rival Silver", "Paul", "Champion Lance", "Boss Giovanni", "Champion Leon"],
+            "Defensive": ["Gym Leader Brock", "Gym Leader Whitney", "Gym Leader Jasmine", "Elite Four Bertha", "Gym Leader Roxanne"],
+            "Balanced": ["Pokemon Trainer Red", "Champion Cynthia", "Champion Steven", "Pokemon Trainer Ash", "Professor Oak", "Pokemon Trainer Dawn"]
+        }
+        bot_personality = random.choice(list(bot_personalities.keys()))
+        bot_name = random.choice(bot_personalities[bot_personality])
         
         user_db = await db.get_user(user.id)
         if not user_db:
@@ -83,7 +88,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "action_text": "",
             "is_ranked": match_type == "ranked",
             "p1": {"id": user.id, "name": user.first_name, "tag": user.username or user.first_name, "team": p1_team, "active": 0, "dm_chat_id": query.message.chat_id, "dm_msg_id": dm_msg.message_id, "damage_dealt": 0},
-            "p2": {"id": -1, "name": f"{bot_personality} AI", "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
+            "p2": {"id": -1, "name": bot_name, "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
             "choices": {"p1": None, "p2": None},
             "menus": {"p1": "main", "p2": "main"},
             "spectators": {},
@@ -108,8 +113,13 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         battle_id = f"bai_{query.message.message_id}"
         
-        bot_personalities = ["Aggressive", "Defensive", "Balanced"]
-        bot_personality = random.choice(bot_personalities)
+        bot_personalities = {
+            "Aggressive": ["Rival Blue", "Rival Silver", "Paul", "Champion Lance", "Boss Giovanni", "Champion Leon"],
+            "Defensive": ["Gym Leader Brock", "Gym Leader Whitney", "Gym Leader Jasmine", "Elite Four Bertha", "Gym Leader Roxanne"],
+            "Balanced": ["Pokemon Trainer Red", "Champion Cynthia", "Champion Steven", "Pokemon Trainer Ash", "Professor Oak", "Pokemon Trainer Dawn"]
+        }
+        bot_personality = random.choice(list(bot_personalities.keys()))
+        bot_name = random.choice(bot_personalities[bot_personality])
         
         user_db = await db.get_user(user.id)
         if not user_db:
@@ -129,7 +139,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "action_text": "",
             "is_ranked": True,
             "p1": {"id": user.id, "name": user.first_name, "tag": user.username or user.first_name, "team": p1_team, "active": 0, "dm_chat_id": query.message.chat_id, "dm_msg_id": dm_msg.message_id, "damage_dealt": 0},
-            "p2": {"id": -1, "name": f"{bot_personality} AI", "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
+            "p2": {"id": -1, "name": bot_name, "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
             "choices": {"p1": None, "p2": None},
             "menus": {"p1": "main", "p2": "main"},
             "spectators": {},
