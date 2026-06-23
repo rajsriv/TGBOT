@@ -297,7 +297,7 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
             
         draw.text(((WIDTH - vs_width) / 2, start_y + 60), vs_text, font=vs_font, fill=BORDER_RED)
     active_collectible = user_data.get("active_collectible")
-    if active_collectible and card_type != "PROFILE":
+    if active_collectible and card_type != "TRAINER":
         try:
             coll_path = os.path.join(os.path.dirname(__file__), "assets", "collectibles", f"{active_collectible}.png")
             if os.path.exists(coll_path):
