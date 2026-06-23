@@ -154,76 +154,92 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                 
                 active_collectible = user_data.get("active_collectible")
                 
-                if active_collectible in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
-                    ball_type = active_collectible.split("_")[0]
-                    if ball_type == "gs": top_color = "#ffd700"
-                    elif ball_type == "master": top_color = "#8b4ca3"
-                    elif ball_type == "ultra": top_color = "#313131"
-                    elif ball_type == "great": top_color = "#3b82c4"
-                    else: top_color = "#d95c50"
-                else:
-                    if str(user_data.get('_id', '')) == "7877671131":
-                        ball_type = "gs"
-                        top_color = "#ffd700"
-                    elif elo >= 1300:
-                        ball_type = "master"
-                        top_color = "#8b4ca3"
-                    elif elo >= 1200:
-                        ball_type = "ultra"
-                        top_color = "#313131"
-                    elif elo >= 1100:
-                        ball_type = "great"
-                        top_color = "#3b82c4"
+                sprite_drawn = False
+                if active_collectible and active_collectible not in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
+                    try:
+                        coll_path = os.path.join(os.path.dirname(__file__), "assets", "collectibles", f"{active_collectible}.png")
+                        if os.path.exists(coll_path):
+                            coll_img = Image.open(coll_path).convert("RGBA")
+                            coll_img.thumbnail((130, 130), Image.NEAREST)
+                            
+                            paste_x = pb_x + (pb_size - coll_img.width) // 2
+                            paste_y = pb_y + (pb_size - coll_img.height) // 2
+                            img.paste(coll_img, (paste_x, paste_y), coll_img)
+                            sprite_drawn = True
+                    except Exception:
+                        pass
+                
+                if not sprite_drawn:
+                    if active_collectible in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
+                        ball_type = active_collectible.split("_")[0]
+                        if ball_type == "gs": top_color = "#ffd700"
+                        elif ball_type == "master": top_color = "#8b4ca3"
+                        elif ball_type == "ultra": top_color = "#313131"
+                        elif ball_type == "great": top_color = "#3b82c4"
+                        else: top_color = "#d95c50"
                     else:
-                        ball_type = "poke"
-                        top_color = "#d95c50"
+                        if str(user_data.get('_id', '')) == "7877671131":
+                            ball_type = "gs"
+                            top_color = "#ffd700"
+                        elif elo >= 1300:
+                            ball_type = "master"
+                            top_color = "#8b4ca3"
+                        elif elo >= 1200:
+                            ball_type = "ultra"
+                            top_color = "#313131"
+                        elif elo >= 1100:
+                            ball_type = "great"
+                            top_color = "#3b82c4"
+                        else:
+                            ball_type = "poke"
+                            top_color = "#d95c50"
                 
-                # Base white circle with black outline
-                draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+                    # Base white circle with black outline
+                    draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)
+                    
+                    # Top half (chord)
+                    draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill=top_color, outline="#1a1a1a", width=2)
+                    
+                    if ball_type == "great":
+                        # Red marks
+                        draw.chord([pb_x+15, pb_y+15, pb_x+45, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+                        draw.chord([pb_x+pb_size-45, pb_y+15, pb_x+pb_size-15, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+                    elif ball_type == "ultra":
+                        # Yellow H-shape
+                        draw.chord([pb_x+20, pb_y+10, pb_x+pb_size-20, pb_y+pb_size//2+10], 180, 360, fill="#f2d12e")
+                        draw.chord([pb_x+35, pb_y+25, pb_x+pb_size-35, pb_y+pb_size//2+10], 180, 360, fill="#313131")
+                    elif ball_type == "master":
+                        # Pink circles and white M
+                        draw.ellipse([pb_x+15, pb_y+20, pb_x+45, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
+                        draw.ellipse([pb_x+pb_size-45, pb_y+20, pb_x+pb_size-15, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
+                        try:
+                            m_width = draw.textlength("M", font=title_font)
+                        except AttributeError:
+                            m_width = 15
+                        draw.text((pb_x + (pb_size - m_width)/2, pb_y+15), "M", font=title_font, fill="#ffffff")
+                    elif ball_type == "gs":
+                        # GS letters
+                        try:
+                            gs_width = draw.textlength("GS", font=title_font)
+                        except AttributeError:
+                            gs_width = 30
+                        draw.text((pb_x + (pb_size - gs_width)/2, pb_y+15), "GS", font=title_font, fill="#1a1a1a")
+                    
+                    # Middle black band
+                    band_y = pb_y + (pb_size // 2) - 4
+                    draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
+                    
+                    # Center button (outer black circle)
+                    btn_size = 36
+                    btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
+                    btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
+                    draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
                 
-                # Top half (chord)
-                draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill=top_color, outline="#1a1a1a", width=2)
-                
-                if ball_type == "great":
-                    # Red marks
-                    draw.chord([pb_x+15, pb_y+15, pb_x+45, pb_y+pb_size//2], 180, 360, fill="#d95c50")
-                    draw.chord([pb_x+pb_size-45, pb_y+15, pb_x+pb_size-15, pb_y+pb_size//2], 180, 360, fill="#d95c50")
-                elif ball_type == "ultra":
-                    # Yellow H-shape
-                    draw.chord([pb_x+20, pb_y+10, pb_x+pb_size-20, pb_y+pb_size//2+10], 180, 360, fill="#f2d12e")
-                    draw.chord([pb_x+35, pb_y+25, pb_x+pb_size-35, pb_y+pb_size//2+10], 180, 360, fill="#313131")
-                elif ball_type == "master":
-                    # Pink circles and white M
-                    draw.ellipse([pb_x+15, pb_y+20, pb_x+45, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
-                    draw.ellipse([pb_x+pb_size-45, pb_y+20, pb_x+pb_size-15, pb_y+50], fill="#f56ab0", outline="#1a1a1a")
-                    try:
-                        m_width = draw.textlength("M", font=title_font)
-                    except AttributeError:
-                        m_width = 15
-                    draw.text((pb_x + (pb_size - m_width)/2, pb_y+15), "M", font=title_font, fill="#ffffff")
-                elif ball_type == "gs":
-                    # GS letters
-                    try:
-                        gs_width = draw.textlength("GS", font=title_font)
-                    except AttributeError:
-                        gs_width = 30
-                    draw.text((pb_x + (pb_size - gs_width)/2, pb_y+15), "GS", font=title_font, fill="#1a1a1a")
-                
-                # Middle black band
-                band_y = pb_y + (pb_size // 2) - 4
-                draw.rectangle([pb_x + 2, band_y, pb_x + pb_size - 2, band_y + 8], fill="#1a1a1a")
-                
-                # Center button (outer black circle)
-                btn_size = 36
-                btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
-                btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
-                draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
-                
-                # Center button (inner white circle)
-                ibtn_size = 20
-                ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
-                ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
-                draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
+                    # Center button (inner white circle)
+                    ibtn_size = 20
+                    ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
+                    ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
+                    draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=1)
     else:
         # VS Layout (BATTLE / RESULT)
         box_w, box_h = 56, 56
@@ -281,7 +297,7 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
             
         draw.text(((WIDTH - vs_width) / 2, start_y + 60), vs_text, font=vs_font, fill=BORDER_RED)
     active_collectible = user_data.get("active_collectible")
-    if active_collectible:
+    if active_collectible and card_type != "PROFILE":
         try:
             coll_path = os.path.join(os.path.dirname(__file__), "assets", "collectibles", f"{active_collectible}.png")
             if os.path.exists(coll_path):
