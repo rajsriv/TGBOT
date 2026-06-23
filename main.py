@@ -32,8 +32,9 @@ def main():
     application.add_handler(CommandHandler("showdown", showdown_command))
     application.add_handler(CommandHandler("match", match_command))
     application.add_handler(CommandHandler("profile", profile_command))
-    from handlers.vault import handle_vault_command, handle_equip_callback
+    from handlers.vault import handle_vault_command, handle_equip_callback, handle_reward_command
     application.add_handler(CommandHandler("vault", handle_vault_command))
+    application.add_handler(CommandHandler("reward", handle_reward_command))
     application.add_handler(CallbackQueryHandler(handle_move_callback, pattern="^btn_"))
     application.add_handler(CallbackQueryHandler(handle_match_callback, pattern="^match_"))
     application.add_handler(CallbackQueryHandler(handle_equip_callback, pattern="^equip_"))

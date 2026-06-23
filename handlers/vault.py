@@ -144,3 +144,44 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
     except Exception:
         pass
+
+async def handle_reward_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if str(user.id) != config.OWNER_ID:
+        await update.message.reply_text("This command is restricted to the bot owner.")
+        return
+        
+    if len(context.args) < 2:
+        items_list = "\n".join([f"{i}. {item}" for i, item in enumerate(ALL_COLLECTIBLES)])
+        await update.message.reply_text(f"Usage: /reward <user_id> <item_no>\n\nItems:\n{items_list}")
+        return
+        
+    try:
+        target_id = int(context.args[0])
+        item_no = int(context.args[1])
+    except ValueError:
+        await update.message.reply_text("Invalid user ID or item number.")
+        return
+        
+    if item_no < 0 or item_no >= len(ALL_COLLECTIBLES):
+        await update.message.reply_text("Invalid item number.")
+        return
+        
+    item_name = ALL_COLLECTIBLES[item_no]
+    
+    target_user = await db.get_user(target_id)
+    if not target_user:
+        await update.message.reply_text("User not found in database.")
+        return
+        
+    await db.unlock_collectible(target_id, item_name)
+    await update.message.reply_text(f"Successfully awarded {item_name.replace('_', ' ').title()} to user {target_id}!")
+    
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=f"🎉 <b>Congratulations!</b>\n\nYou've been awarded a new collectible: <b>{item_name.replace('_', ' ').title()}</b>!\nCheck it out using /vault",
+            parse_mode="HTML"
+        )
+    except Exception:
+        pass
