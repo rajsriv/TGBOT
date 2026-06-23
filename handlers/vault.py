@@ -14,19 +14,24 @@ ALL_COLLECTIBLES = [
     "red_sprite"
 ]
 
-def build_vault_text(first_name, collectibles):
+def build_vault_text(first_name, collectibles, active):
     lines = [f"<b>Vault - {first_name}</b>\n"]
     
     for i, item in enumerate(ALL_COLLECTIBLES):
         prefix = "┍" if i == 0 else ("┕" if i == len(ALL_COLLECTIBLES)-1 else "┝")
-        symbol = "◈" if item in collectibles else "◇"
+        if item == active:
+            symbol = "◆"
+        else:
+            symbol = "◈" if item in collectibles else "◇"
+            
         name = item.replace('_', ' ').title()
         
         lines.append(f"{prefix}{symbol} {name}")
         if i < len(ALL_COLLECTIBLES)-1:
             lines.append("│")
             
-    lines.append("\n◈ [owned]")
+    lines.append("\n◆ [equipped]")
+    lines.append("◈ [owned]")
     lines.append("◇ [not owned]")
     return "\n".join(lines)
 
@@ -79,7 +84,7 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
     active = user_db.get("active_collectible")
     username = user_db.get("username", user.first_name)
     
-    text = build_vault_text(username, collectibles)
+    text = build_vault_text(username, collectibles, active)
     reply_markup = build_vault_buttons(collectibles, active, page=0)
     
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -122,7 +127,7 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
     active = user_db.get("active_collectible")
     username = user_db.get("username", query.from_user.first_name)
     
-    text = build_vault_text(username, collectibles)
+    text = build_vault_text(username, collectibles, active)
     reply_markup = build_vault_buttons(collectibles, active, page)
     
     try:
