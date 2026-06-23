@@ -14,11 +14,16 @@ ALL_COLLECTIBLES = [
     "red_sprite"
 ]
 
-def build_vault_text(first_name, collectibles, active):
+def build_vault_text(first_name, collectibles, active, is_group=False):
     lines = [f"<b>Vault - {first_name}</b>\n"]
     
-    for i, item in enumerate(ALL_COLLECTIBLES):
-        prefix = "┍" if i == 0 else ("┕" if i == len(ALL_COLLECTIBLES)-1 else "┝")
+    display_items = [item for item in ALL_COLLECTIBLES if item in collectibles] if is_group else ALL_COLLECTIBLES
+    
+    if not display_items and is_group:
+        return f"<b>Vault - {first_name}</b>\n\nEmpty!"
+        
+    for i, item in enumerate(display_items):
+        prefix = "┍" if i == 0 else ("┕" if i == len(display_items)-1 else "┝")
         if item == active:
             symbol = "◆"
         else:
@@ -27,12 +32,13 @@ def build_vault_text(first_name, collectibles, active):
         name = item.replace('_', ' ').title()
         
         lines.append(f"{prefix}{symbol} {name}")
-        if i < len(ALL_COLLECTIBLES)-1:
+        if not is_group and i < len(display_items)-1:
             lines.append("│")
             
     lines.append("\n◆ [equipped]")
-    lines.append("◈ [owned]")
-    lines.append("◇ [not owned]")
+    if not is_group:
+        lines.append("◈ [owned]")
+        lines.append("◇ [not owned]")
     return "\n".join(lines)
 
 def build_vault_buttons(collectibles, active, page=0):
@@ -84,7 +90,7 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
     active = user_db.get("active_collectible")
     username = user_db.get("username", user.first_name)
     
-    text = build_vault_text(username, collectibles, active)
+    text = build_vault_text(username, collectibles, active, update.effective_chat.type != "private")
     
     if update.effective_chat.type == "private":
         reply_markup = build_vault_buttons(collectibles, active, page=0)
