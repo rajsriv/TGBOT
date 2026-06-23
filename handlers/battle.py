@@ -941,6 +941,10 @@ async def resolve_turn(battle_id, context, query):
                                 recoil_dmg = max(1, int(actual_dmg * recoil_frac))
                                 atk_pkmn["hp"] = max(0, atk_pkmn["hp"] - recoil_dmg)
                                 action_text += f"💥 {atk_pkmn['name']} was damaged by the recoil! (-{recoil_dmg} HP)\n"
+                                
+                        if m_name in ["explosion", "self-destruct", "misty explosion"]:
+                            atk_pkmn["hp"] = 0
+                            action_text += f"💥 {atk_pkmn['name']} blew itself up!\n"
                 
                 if move["power"] == 0:
                     m_name = move["name"].lower()
@@ -997,6 +1001,22 @@ async def resolve_turn(battle_id, context, query):
                             def_pkmn["confusion_turns"] = random.randint(2, 5)
                             action_text += f"💫 {def_pkmn['name']} became confused!\n"
                         else: action_text += "But it failed!\n"
+                    elif m_name in ["roost", "recover", "soft-boiled", "milk drink", "slack off", "heal order", "morning sun", "synthesis", "moonlight"]:
+                        if atk_pkmn["hp"] < atk_pkmn["max_hp"]:
+                            heal_amt = atk_pkmn["max_hp"] // 2
+                            atk_pkmn["hp"] = min(atk_pkmn["max_hp"], atk_pkmn["hp"] + heal_amt)
+                            action_text += f"💚 {atk_pkmn['name']} restored its HP!\n"
+                        else:
+                            action_text += "But it failed!\n"
+                    elif m_name == "rest":
+                        if atk_pkmn["hp"] < atk_pkmn["max_hp"] and atk_pkmn.get("status") != "sleep":
+                            atk_pkmn["hp"] = atk_pkmn["max_hp"]
+                            atk_pkmn["status"] = "sleep"
+                            atk_pkmn["sleep_turns"] = 2
+                            atk_pkmn["toxic_turns"] = 1
+                            action_text += f"💤 {atk_pkmn['name']} went to sleep and restored its health!\n"
+                        else:
+                            action_text += "But it failed!\n"
                     elif m_name == "toxic":
                         if "poison" in def_pkmn["types"] or "steel" in def_pkmn["types"] or not can_status(def_pkmn, "poison"):
                             action_text += "But it failed!\n"
@@ -1151,8 +1171,12 @@ async def resolve_turn(battle_id, context, query):
                         def_pkmn["status"] = "frozen"
                         action_text += f"🧊 {def_pkmn['name']} was frozen solid!\n"
                         
-                if def_pkmn["hp"] > 0 and type_mod > 0 and move["class"] == "physical" and not hit_substitute:
-                    if move["name"].lower() in ["bite", "headbutt", "rock slide", "waterfall", "iron head", "air slash", "dark pulse", "fake out"]:
+                if def_pkmn["hp"] > 0 and type_mod > 0 and not hit_substitute:
+                    m_lower = move["name"].lower()
+                    if m_lower == "fake out":
+                        if "flinch" not in def_pkmn.setdefault("volatile_status", []):
+                            def_pkmn["volatile_status"].append("flinch")
+                    elif m_lower in ["bite", "headbutt", "rock slide", "waterfall", "iron head", "air slash", "dark pulse"]:
                         if random.randint(1, 100) <= 30:
                             if "flinch" not in def_pkmn.setdefault("volatile_status", []):
                                 def_pkmn["volatile_status"].append("flinch")
