@@ -152,21 +152,31 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
                 pb_y = 125
                 pb_size = 130
                 
-                if str(user_data.get('_id', '')) == "7877671131":
-                    ball_type = "gs"
-                    top_color = "#ffd700"
-                elif elo >= 1300:
-                    ball_type = "master"
-                    top_color = "#8b4ca3"
-                elif elo >= 1200:
-                    ball_type = "ultra"
-                    top_color = "#313131"
-                elif elo >= 1100:
-                    ball_type = "great"
-                    top_color = "#3b82c4"
+                active_collectible = user_data.get("active_collectible")
+                
+                if active_collectible in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
+                    ball_type = active_collectible.split("_")[0]
+                    if ball_type == "gs": top_color = "#ffd700"
+                    elif ball_type == "master": top_color = "#8b4ca3"
+                    elif ball_type == "ultra": top_color = "#313131"
+                    elif ball_type == "great": top_color = "#3b82c4"
+                    else: top_color = "#d95c50"
                 else:
-                    ball_type = "poke"
-                    top_color = "#d95c50"
+                    if str(user_data.get('_id', '')) == "7877671131":
+                        ball_type = "gs"
+                        top_color = "#ffd700"
+                    elif elo >= 1300:
+                        ball_type = "master"
+                        top_color = "#8b4ca3"
+                    elif elo >= 1200:
+                        ball_type = "ultra"
+                        top_color = "#313131"
+                    elif elo >= 1100:
+                        ball_type = "great"
+                        top_color = "#3b82c4"
+                    else:
+                        ball_type = "poke"
+                        top_color = "#d95c50"
                 
                 # Base white circle with black outline
                 draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=4)

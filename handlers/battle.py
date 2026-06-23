@@ -258,6 +258,8 @@ async def sync_battle_state(battle_id, context):
                 if p1_new_db.get("wins", 0) >= 10 and p1_db.get("wins", 0) < 10: unlocks.append("great_ball")
                 if p1_new_db.get("wins", 0) >= 50 and p1_db.get("wins", 0) < 50: unlocks.append("squirtle_squad")
                 if p1_new_db.get("wins", 0) >= 100 and p1_db.get("wins", 0) < 100: unlocks.append("mew")
+                if p1_new_db.get("elo", 1000) >= 1200 and p1_db.get("elo", 1000) < 1200: unlocks.append("ultra_ball")
+                if p1_new_db.get("elo", 1000) >= 1300 and p1_db.get("elo", 1000) < 1300: unlocks.append("master_ball")
                 if p1_new_db.get("elo", 1000) >= 1500 and p1_db.get("elo", 1000) < 1500: unlocks.append("red_sprite")
                 for item in unlocks:
                     if item not in p1_new_db.get("collectibles", []):
@@ -273,6 +275,8 @@ async def sync_battle_state(battle_id, context):
                     if p2_new_db.get("wins", 0) >= 10 and p2_db.get("wins", 0) < 10: unlocks.append("great_ball")
                     if p2_new_db.get("wins", 0) >= 50 and p2_db.get("wins", 0) < 50: unlocks.append("squirtle_squad")
                     if p2_new_db.get("wins", 0) >= 100 and p2_db.get("wins", 0) < 100: unlocks.append("mew")
+                    if p2_new_db.get("elo", 1000) >= 1200 and p2_db.get("elo", 1000) < 1200: unlocks.append("ultra_ball")
+                    if p2_new_db.get("elo", 1000) >= 1300 and p2_db.get("elo", 1000) < 1300: unlocks.append("master_ball")
                     if p2_new_db.get("elo", 1000) >= 1500 and p2_db.get("elo", 1000) < 1500: unlocks.append("red_sprite")
                     for item in unlocks:
                         if item not in p2_new_db.get("collectibles", []):

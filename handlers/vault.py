@@ -6,6 +6,9 @@ from database import db
 ALL_COLLECTIBLES = [
     "poke_ball",
     "great_ball",
+    "ultra_ball",
+    "master_ball",
+    "gs_ball",
     "squirtle_squad",
     "mew",
     "red_sprite"
