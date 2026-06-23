@@ -251,9 +251,34 @@ async def sync_battle_state(battle_id, context):
             p1_seen = [p["name"] for p in battle["p1"]["team"]] + [p["name"] for p in battle["p2"]["team"]]
             p2_seen = p1_seen
             
-            await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change, p1_seen)
+            p1_new_db = await db.update_battle_stats(battle["p1"]["id"], p1_won, battle["p1"]["damage_dealt"], p1_elo_change, p1_seen)
+            if p1_db and p1_new_db and battle["p1"].get("dm_chat_id"):
+                unlocks = []
+                if p1_new_db.get("wins", 0) >= 1 and p1_db.get("wins", 0) < 1: unlocks.append("poke_ball")
+                if p1_new_db.get("wins", 0) >= 10 and p1_db.get("wins", 0) < 10: unlocks.append("great_ball")
+                if p1_new_db.get("wins", 0) >= 50 and p1_db.get("wins", 0) < 50: unlocks.append("squirtle_squad")
+                if p1_new_db.get("wins", 0) >= 100 and p1_db.get("wins", 0) < 100: unlocks.append("mew")
+                if p1_new_db.get("elo", 1000) >= 1500 and p1_db.get("elo", 1000) < 1500: unlocks.append("red_sprite")
+                for item in unlocks:
+                    if item not in p1_new_db.get("collectibles", []):
+                        await db.unlock_collectible(battle["p1"]["id"], item)
+                        try: await context.bot.send_message(chat_id=battle["p1"]["dm_chat_id"], text=f"🎉 <b>Milestone Reached!</b>\nYou unlocked the <b>{item.replace('_', ' ').title()}</b> collectible!\nUse /vault to equip it.", parse_mode="HTML")
+                        except Exception: pass
+
             if not battle["p2"].get("is_bot"):
-                await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change, p2_seen)
+                p2_new_db = await db.update_battle_stats(battle["p2"]["id"], p2_won, battle["p2"]["damage_dealt"], p2_elo_change, p2_seen)
+                if p2_db and p2_new_db and battle["p2"].get("dm_chat_id"):
+                    unlocks = []
+                    if p2_new_db.get("wins", 0) >= 1 and p2_db.get("wins", 0) < 1: unlocks.append("poke_ball")
+                    if p2_new_db.get("wins", 0) >= 10 and p2_db.get("wins", 0) < 10: unlocks.append("great_ball")
+                    if p2_new_db.get("wins", 0) >= 50 and p2_db.get("wins", 0) < 50: unlocks.append("squirtle_squad")
+                    if p2_new_db.get("wins", 0) >= 100 and p2_db.get("wins", 0) < 100: unlocks.append("mew")
+                    if p2_new_db.get("elo", 1000) >= 1500 and p2_db.get("elo", 1000) < 1500: unlocks.append("red_sprite")
+                    for item in unlocks:
+                        if item not in p2_new_db.get("collectibles", []):
+                            await db.unlock_collectible(battle["p2"]["id"], item)
+                            try: await context.bot.send_message(chat_id=battle["p2"]["dm_chat_id"], text=f"🎉 <b>Milestone Reached!</b>\nYou unlocked the <b>{item.replace('_', ' ').title()}</b> collectible!\nUse /vault to equip it.", parse_mode="HTML")
+                            except Exception: pass
             
             elo_text = f"\n\n📈 {battle['p1']['name']}: {p1_elo_change:+d} Elo"
             if not battle["p2"].get("is_bot"): elo_text += f"\n📉 {battle['p2']['name']}: {p2_elo_change:+d} Elo"

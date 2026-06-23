@@ -22,7 +22,9 @@ class Database:
             "wins": 0,
             "losses": 0,
             "elo": 1000,
-            "total_damage": 0
+            "total_damage": 0,
+            "collectibles": [],
+            "active_collectible": None
         }
         await self.users.insert_one(user)
         return user
@@ -43,9 +45,22 @@ class Database:
         if seen_pokemon:
             update_doc["$addToSet"] = {"dex": {"$each": seen_pokemon}}
             
+        return await self.users.find_one_and_update(
+            {"_id": user_id},
+            update_doc,
+            return_document=True
+        )
+        
+    async def unlock_collectible(self, user_id: int, collectible: str):
         await self.users.update_one(
             {"_id": user_id},
-            update_doc
+            {"$addToSet": {"collectibles": collectible}}
+        )
+        
+    async def set_active_collectible(self, user_id: int, collectible: str):
+        await self.users.update_one(
+            {"_id": user_id},
+            {"$set": {"active_collectible": collectible}}
         )
 
 db = Database()
