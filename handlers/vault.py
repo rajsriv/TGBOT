@@ -2,6 +2,43 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import db
 
+ALL_COLLECTIBLES = [
+    "poke_ball",
+    "great_ball",
+    "squirtle_squad",
+    "mew",
+    "red_sprite"
+]
+
+def build_vault_text(first_name, collectibles):
+    lines = [f"<b>Vault - {first_name}</b>\n"]
+    
+    for i, item in enumerate(ALL_COLLECTIBLES):
+        prefix = "┍" if i == 0 else ("┕" if i == len(ALL_COLLECTIBLES)-1 else "┝")
+        symbol = "◈" if item in collectibles else "◇"
+        name = item.replace('_', ' ').title()
+        
+        lines.append(f"{prefix}{symbol} {name}")
+        if i < len(ALL_COLLECTIBLES)-1:
+            lines.append("│")
+            
+    lines.append("\n◈ [owned]")
+    lines.append("◇ [not owned]")
+    return "\n".join(lines)
+
+def build_vault_buttons(collectibles, active):
+    buttons = []
+    for item in collectibles:
+        display_name = item.replace('_', ' ').title()
+        if item == active:
+            display_name = f"✅ {display_name}"
+        buttons.append([InlineKeyboardButton(display_name, callback_data=f"equip_{item}")])
+        
+    if active:
+        buttons.append([InlineKeyboardButton("❌ Unequip Current", callback_data="equip_none")])
+        
+    return InlineKeyboardMarkup(buttons)
+
 async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_db = await db.get_user(user.id)
@@ -11,25 +48,11 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
         
     collectibles = user_db.get("collectibles", [])
     active = user_db.get("active_collectible")
+    username = user_db.get("username", user.first_name)
     
-    if not collectibles:
-        await update.message.reply_text("You don't own any collectibles yet! Keep battling to unlock them.")
-        return
-        
-    text = "🎒 <b>Your Vault</b>\n\nSelect a collectible to display on your trainer card:"
+    text = build_vault_text(username, collectibles)
+    reply_markup = build_vault_buttons(collectibles, active)
     
-    buttons = []
-    for item in collectibles:
-        display_name = item.replace('_', ' ').title()
-        if item == active:
-            display_name = f"✅ {display_name}"
-            
-        buttons.append([InlineKeyboardButton(display_name, callback_data=f"equip_{item}")])
-        
-    if active:
-        buttons.append([InlineKeyboardButton("❌ Unequip Current", callback_data="equip_none")])
-        
-    reply_markup = InlineKeyboardMarkup(buttons)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
 async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,17 +79,12 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
     user_db = await db.get_user(user_id)
     collectibles = user_db.get("collectibles", [])
     active = user_db.get("active_collectible")
+    username = user_db.get("username", query.from_user.first_name)
     
-    text = "🎒 <b>Your Vault</b>\n\nSelect a collectible to display on your trainer card:"
-    buttons = []
-    for c_item in collectibles:
-        display_name = c_item.replace('_', ' ').title()
-        if c_item == active:
-            display_name = f"✅ {display_name}"
-        buttons.append([InlineKeyboardButton(display_name, callback_data=f"equip_{c_item}")])
-        
-    if active:
-        buttons.append([InlineKeyboardButton("❌ Unequip Current", callback_data="equip_none")])
-        
-    reply_markup = InlineKeyboardMarkup(buttons)
-    await query.edit_message_reply_markup(reply_markup=reply_markup)
+    text = build_vault_text(username, collectibles)
+    reply_markup = build_vault_buttons(collectibles, active)
+    
+    try:
+        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
+    except Exception:
+        pass
