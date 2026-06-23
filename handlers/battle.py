@@ -762,6 +762,12 @@ async def resolve_turn(battle_id, context, query):
                     move["pp"] -= 1 # Normal move
                     if "Choice" in atk_pkmn["item"] and "choice_locked" not in atk_pkmn:
                         atk_pkmn["choice_locked"] = choice["index"]
+                        
+                    if move["name"].lower() in ["outrage", "petal dance", "thrash"]:
+                        if "multi_turn" not in atk_pkmn.get("volatile_status", []):
+                            atk_pkmn.setdefault("volatile_status", []).append("multi_turn")
+                            atk_pkmn["multi_turn_move"] = choice["index"]
+                            atk_pkmn["multi_turn_count"] = random.randint(2, 3)
                 
                 if move["name"].lower() in ["protect", "detect"]:
                     success_rate = 100 // (2 ** atk_pkmn.get("protect_counter", 0))
@@ -1256,6 +1262,16 @@ async def resolve_turn(battle_id, context, query):
                         # but we can reset volatile statuses here just in case.
                         atk_pkmn["volatile_status"] = []
                         atk_pkmn["stat_stages"] = {"atk": 0, "def": 0, "sp_atk": 0, "sp_def": 0, "spd": 0, "accuracy": 0, "evasion": 0}
+                        
+                if atk_pkmn["hp"] > 0 and move["name"].lower() in ["outrage", "petal dance", "thrash"]:
+                    if "multi_turn" in atk_pkmn.get("volatile_status", []):
+                        atk_pkmn["multi_turn_count"] -= 1
+                        if atk_pkmn["multi_turn_count"] <= 0:
+                            atk_pkmn["volatile_status"].remove("multi_turn")
+                            if "confused" not in atk_pkmn.get("volatile_status", []):
+                                atk_pkmn["volatile_status"].append("confused")
+                                atk_pkmn["confusion_turns"] = random.randint(2, 5)
+                                action_text += f"💫 {atk_pkmn['name']} became confused due to fatigue!\n"
             elif choice["type"] == "recharge":
                 atk_pkmn = player["team"][player["active"]]
                 action_text += f"💤 {atk_pkmn['name']} must recharge!\n"
@@ -1391,6 +1407,8 @@ async def resolve_turn(battle_id, context, query):
             pkmn = battle[p_key]["team"][battle[p_key]["active"]]
             if "charging" in pkmn.get("volatile_status", []):
                 battle["choices"][p_key] = {"type": "move", "index": pkmn.get("charging_move", 0)}
+            elif "multi_turn" in pkmn.get("volatile_status", []):
+                battle["choices"][p_key] = {"type": "move", "index": pkmn.get("multi_turn_move", 0)}
             elif "recharging" in pkmn.get("volatile_status", []):
                 battle["choices"][p_key] = {"type": "recharge"}
                 
