@@ -296,27 +296,7 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
             vs_width = 40
             
         draw.text(((WIDTH - vs_width) / 2, start_y + 60), vs_text, font=vs_font, fill=BORDER_RED)
-    active_collectible = user_data.get("active_collectible")
-    if active_collectible and card_type != "TRAINER":
-        try:
-            coll_path = os.path.join(os.path.dirname(__file__), "assets", "collectibles", f"{active_collectible}.png")
-            if os.path.exists(coll_path):
-                coll_img = Image.open(coll_path).convert("RGBA")
-                # Maintain aspect ratio for sprites
-                coll_img.thumbnail((80, 80), Image.NEAREST)
-                
-                # Top right corner
-                paste_x = WIDTH - 20 - coll_img.width
-                paste_y = 60
-                
-                if card_type == "BATTLE":
-                    # Put it on bottom right
-                    paste_x = WIDTH - 20 - coll_img.width
-                    paste_y = HEIGHT - 20 - coll_img.height
-                
-                img.paste(coll_img, (paste_x, paste_y), coll_img)
-        except Exception:
-            pass
+
 
     # Save to bytes
     bio = io.BytesIO()
