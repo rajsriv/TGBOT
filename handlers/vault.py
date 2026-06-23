@@ -30,16 +30,39 @@ def build_vault_text(first_name, collectibles):
     lines.append("◇ [not owned]")
     return "\n".join(lines)
 
-def build_vault_buttons(collectibles, active):
+def build_vault_buttons(collectibles, active, page=0):
+    ITEMS_PER_PAGE = 4
+    start_idx = page * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    
+    current_items = collectibles[start_idx:end_idx]
+    
     buttons = []
-    for item in collectibles:
+    row = []
+    for item in current_items:
         display_name = item.replace('_', ' ').title()
         if item == active:
             display_name = f"✅ {display_name}"
-        buttons.append([InlineKeyboardButton(display_name, callback_data=f"equip_{item}")])
+        
+        row.append(InlineKeyboardButton(display_name, callback_data=f"equip_{item}:{page}"))
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+            
+    if row:
+        buttons.append(row)
+        
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"equip_page:{page-1}"))
+    if end_idx < len(collectibles):
+        nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"equip_page:{page+1}"))
+        
+    if nav_row:
+        buttons.append(nav_row)
         
     if active:
-        buttons.append([InlineKeyboardButton("❌ Unequip Current", callback_data="equip_none")])
+        buttons.append([InlineKeyboardButton("❌ Unequip Current", callback_data=f"equip_none:{page}")])
         
     return InlineKeyboardMarkup(buttons)
 
@@ -57,7 +80,7 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
     username = user_db.get("username", user.first_name)
     
     text = build_vault_text(username, collectibles)
-    reply_markup = build_vault_buttons(collectibles, active)
+    reply_markup = build_vault_buttons(collectibles, active, page=0)
     
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
@@ -66,10 +89,20 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
     data = query.data.split('_', 1)
     if len(data) < 2: return
     
-    item = data[1]
+    item_and_page = data[1]
+    
+    if ':' in item_and_page:
+        item, page_str = item_and_page.split(':')
+        page = int(page_str)
+    else:
+        item = item_and_page
+        page = 0
+        
     user_id = query.from_user.id
     
-    if item == "none":
+    if item == "page":
+        await query.answer()
+    elif item == "none":
         await db.set_active_collectible(user_id, None)
         await query.answer("Collectible unequipped!")
     else:
@@ -90,7 +123,7 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
     username = user_db.get("username", query.from_user.first_name)
     
     text = build_vault_text(username, collectibles)
-    reply_markup = build_vault_buttons(collectibles, active)
+    reply_markup = build_vault_buttons(collectibles, active, page)
     
     try:
         await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
