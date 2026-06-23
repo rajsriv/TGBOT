@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+import config
 from database import db
 
 ALL_COLLECTIBLES = [
@@ -47,6 +48,8 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
         
     collectibles = user_db.get("collectibles", [])
+    if str(user.id) == config.OWNER_ID:
+        collectibles = ALL_COLLECTIBLES
     active = user_db.get("active_collectible")
     username = user_db.get("username", user.first_name)
     
@@ -68,7 +71,7 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("Collectible unequipped!")
     else:
         user_db = await db.get_user(user_id)
-        if item in user_db.get("collectibles", []):
+        if item in user_db.get("collectibles", []) or str(user_id) == config.OWNER_ID:
             await db.set_active_collectible(user_id, item)
             await query.answer(f"Equipped {item.replace('_', ' ').title()}!")
         else:
@@ -78,6 +81,8 @@ async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # Refresh vault view
     user_db = await db.get_user(user_id)
     collectibles = user_db.get("collectibles", [])
+    if str(user_id) == config.OWNER_ID:
+        collectibles = ALL_COLLECTIBLES
     active = user_db.get("active_collectible")
     username = user_db.get("username", query.from_user.first_name)
     
