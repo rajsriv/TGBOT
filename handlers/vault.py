@@ -85,8 +85,12 @@ async def handle_vault_command(update: Update, context: ContextTypes.DEFAULT_TYP
     username = user_db.get("username", user.first_name)
     
     text = build_vault_text(username, collectibles, active)
-    reply_markup = build_vault_buttons(collectibles, active, page=0)
     
+    if update.effective_chat.type == "private":
+        reply_markup = build_vault_buttons(collectibles, active, page=0)
+    else:
+        reply_markup = None
+        
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
 async def handle_equip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
