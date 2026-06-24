@@ -26,11 +26,11 @@ async def rank_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elo = user.get("elo", 1000)
     
     ranks = [
-        "<b>&lt; 1100:</b> Poké Ball Rank (Default)",
-        "<b>1100 - 1199:</b> Great Ball Rank <i>(Unlocks Great Ball Emblem)</i>",
-        "<b>1200 - 1299:</b> Ultra Ball Rank <i>(Unlocks Ultra Ball Emblem)</i>",
-        "<b>1300 - 1499:</b> Master Ball Rank <i>(Unlocks Master Ball Emblem)</i>",
-        "<b>1500+:</b> Pokémon Champion <i>(Unlocks Red Sprite)</i>"
+        "<b>&lt; 1100:</b> Rookie Rank",
+        "<b>1100 - 1199:</b> Great Rank",
+        "<b>1200 - 1299:</b> Ultra Rank",
+        "<b>1300 - 1499:</b> Master Rank",
+        "<b>1500+:</b> Pokémon Champion"
     ]
     
     rank_lines = []
@@ -55,7 +55,7 @@ async def rank_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"Current Elo: <b>{elo}</b>\n\n"
         "🏆 <b>Elo Brackets & Rewards</b>\n"
         f"{rank_str}\n\n"
-        "<i>Keep battling in /showdown and /match to increase your Elo and unlock these exclusive emblems for your Trainer Card!</i>"
+        "<i>Keep battling in /showdown and /match to increase your Elo and unlock many rank exclusive emblems for your Trainer Card!</i>"
     )
     
     await update.message.reply_text(msg, parse_mode="HTML")
