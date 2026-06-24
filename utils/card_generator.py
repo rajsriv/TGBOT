@@ -559,32 +559,20 @@ def generate_team_card(team):
                 pass
                 
         name = pkmn["name"].upper()
-        try:
-            name_w = draw.textlength(name, font=name_font)
-        except:
-            name_w = len(name) * 10
-            
-        use_font = name_font
-        py_offset = 8
-        if name_w > 130:
-            use_font = small_font
-            py_offset = 12
+        
+        while True:
             try:
-                name_w = draw.textlength(name, font=use_font)
+                name_w = draw.textlength(name, font=name_font)
             except:
-                name_w = len(name) * 7
+                name_w = len(name) * 10
                 
-            if name_w > 130:
-                use_font = tiny_font
-                py_offset = 14
-                try:
-                    name_w = draw.textlength(name, font=use_font)
-                except:
-                    name_w = len(name) * 6
-                
+            if name_w <= 135 or len(name) <= 3:
+                break
+            name = name[:-1]
+            
         name_x = px + 140 - name_w / 2
         if name_x < px + 70: name_x = px + 70
-        draw.text((name_x, py + py_offset), name, font=use_font, fill="#ffffff")
+        draw.text((name_x, py + 8), name, font=name_font, fill="#ffffff")
         
         bar_x = px + 75
         bar_y = py + 38
