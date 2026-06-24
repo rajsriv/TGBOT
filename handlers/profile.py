@@ -25,6 +25,47 @@ async def rank_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
     elo = user.get("elo", 1000)
     
+    if update.message.chat.type != "private":
+        if elo < 1000:
+            rank_name = "Rookie Rank"
+            percentage = -1
+        elif elo < 1100:
+            rank_name = "Rookie Rank"
+            percentage = int(((elo - 1000) / 100) * 100)
+        elif elo < 1200:
+            rank_name = "Great Rank"
+            percentage = int(((elo - 1100) / 100) * 100)
+        elif elo < 1300:
+            rank_name = "Ultra Rank"
+            percentage = int(((elo - 1200) / 100) * 100)
+        elif elo < 1500:
+            rank_name = "Master Rank"
+            percentage = int(((elo - 1300) / 200) * 100)
+        else:
+            rank_name = "Pokémon Champion"
+            percentage = 100
+            
+        if percentage == -1:
+            bar_str = "░░░░░░░░░░"
+            perc_text = "RIP"
+        else:
+            filled = int(percentage / 10)
+            empty = 10 - filled
+            bar_str = ("▓" * filled) + ("░" * empty)
+            perc_text = f"{percentage}%"
+            if elo >= 1500:
+                perc_text = "MAX"
+                
+        msg = (
+            f"<b>Rank :</b> {rank_name} | {elo}\n"
+            f"╔══════════╗\n"
+            f"║{bar_str}║ {perc_text}\n"
+            f"╚══════════╝\n"
+            "<i>see details in DM</i>"
+        )
+        await update.message.reply_text(msg, parse_mode="HTML")
+        return
+
     ranks = [
         "<b>&lt; 1100:</b> Rookie Rank",
         "<b>1100 - 1199:</b> Great Rank",
