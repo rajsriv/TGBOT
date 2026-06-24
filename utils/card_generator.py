@@ -209,8 +209,8 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
     WIDTH, HEIGHT = 480, 320
     
     # Colors
-    BG_BEIGE = "#f8ebd0"
-    BORDER_RED = "#d95c50"
+    BG_BEIGE = "#a5c5f5"      # Now a light blue
+    BORDER_RED = "#426cb4"    # Now a dark blue
     TEXT_BLACK = "#1a1a1a"
     
     # Create base image
