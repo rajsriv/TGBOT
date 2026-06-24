@@ -2,7 +2,176 @@ import io
 import os
 from PIL import Image, ImageDraw, ImageFont
 
+def generate_profile_card_new(user_data, team=None):
+    WIDTH, HEIGHT = 736, 464
+    
+    bg_path = os.path.join(os.path.dirname(__file__), "assets", "trainer_card_bg.png")
+    try:
+        img = Image.open(bg_path).convert("RGBA")
+    except Exception:
+        img = Image.new("RGBA", (WIDTH, HEIGHT), "#f8ebd0")
+        
+    draw = ImageDraw.Draw(img)
+    TEXT_BLACK = "#1a1a1a"
+    TEXT_WHITE = "#ffffff"
+    
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
+    try:
+        name_font = ImageFont.truetype(font_path, 28)
+        text_font = ImageFont.truetype(font_path, 20)
+        title_font = ImageFont.truetype(font_path, 22)
+    except:
+        name_font = ImageFont.load_default()
+        text_font = ImageFont.load_default()
+        title_font = ImageFont.load_default()
+        
+    name_str = user_data.get('first_name') or user_data.get('username', 'Unknown')
+    username = str(name_str)[:12].upper()
+    try:
+        name_width = draw.textlength(username, font=name_font)
+    except AttributeError:
+        name_width = len(username) * 16
+        
+    draw.text((549 - name_width/2, 20), username, font=name_font, fill=TEXT_WHITE)
+    
+    wins = user_data.get('wins', 0)
+    losses = user_data.get('losses', 0)
+    total_dmg = user_data.get('total_damage', 0)
+    total_battles = wins + losses
+    avg_dmg = int(total_dmg / total_battles) if total_battles > 0 else 0
+    win_rate = int((wins / total_battles) * 100) if total_battles > 0 else 0
+    dex_seen = len(user_data.get('dex', []))
+    elo = user_data.get('elo', 1000)
+    
+    stat_x = 60
+    y_start = 140
+    spacing = 35
+    
+    draw.text((stat_x, y_start), f"ELO: {elo}", font=title_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
+    draw.text((stat_x, y_start + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
+    kd_ratio = f"{(wins / losses):.2f}" if losses > 0 else f"{wins:.2f}"
+    draw.text((stat_x + 160, y_start), f"K/D: {kd_ratio}", font=title_font, fill=TEXT_BLACK)
+    draw.text((stat_x + 160, y_start + spacing), f"WIN %: {win_rate}%", font=text_font, fill=TEXT_BLACK)
+    
+    if team:
+        start_x = 60
+        start_y = 280
+        box_w, box_h = 60, 60
+        gap = 15
+        
+        for i, pkmn in enumerate(team):
+            if i >= 6: break
+            row = i // 3
+            col = i % 3
+            x = start_x + col * (box_w + gap)
+            y = start_y + row * (box_h + gap)
+            
+            if "sprite" in pkmn and pkmn["sprite"]:
+                try:
+                    sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
+                    sprite_img = sprite_img.resize((box_w, box_h), Image.NEAREST)
+                    img.paste(sprite_img, (x, y), sprite_img)
+                except Exception:
+                    pass
+    
+    user_id = str(user_data.get('_id', '000000'))
+    draw.rectangle([30, 410, 200, 445], fill="#8eb1aa")
+    draw.text((40, 415), f"ID No. {user_id}", font=text_font, fill=TEXT_WHITE)
+    
+    pb_size = 200
+    pb_x = 481 + (712 - 481 - pb_size) // 2
+    pb_y = 118 + (347 - 118 - pb_size) // 2
+    
+    active_collectible = user_data.get("active_collectible")
+    
+    sprite_drawn = False
+    if active_collectible and active_collectible not in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
+        try:
+            coll_path = os.path.join(os.path.dirname(__file__), "assets", "collectibles", f"{active_collectible}.png")
+            if os.path.exists(coll_path):
+                coll_img = Image.open(coll_path).convert("RGBA")
+                coll_img.thumbnail((pb_size, pb_size), Image.NEAREST)
+                
+                paste_x = pb_x + (pb_size - coll_img.width) // 2
+                paste_y = pb_y + (pb_size - coll_img.height) // 2
+                img.paste(coll_img, (paste_x, paste_y), coll_img)
+                sprite_drawn = True
+        except Exception:
+            pass
+    
+    if not sprite_drawn:
+        if active_collectible in ["gs_ball", "master_ball", "ultra_ball", "great_ball", "poke_ball"]:
+            ball_type = active_collectible.split("_")[0]
+            if ball_type == "gs": top_color = "#ffd700"
+            elif ball_type == "master": top_color = "#8b4ca3"
+            elif ball_type == "ultra": top_color = "#313131"
+            elif ball_type == "great": top_color = "#3b82c4"
+            else: top_color = "#d95c50"
+        else:
+            elo = user_data.get('elo', 1000)
+            if str(user_data.get('_id', '')) == "7877671131":
+                ball_type = "gs"
+                top_color = "#ffd700"
+            elif elo >= 1300:
+                ball_type = "master"
+                top_color = "#8b4ca3"
+            elif elo >= 1200:
+                ball_type = "ultra"
+                top_color = "#313131"
+            elif elo >= 1100:
+                ball_type = "great"
+                top_color = "#3b82c4"
+            else:
+                ball_type = "poke"
+                top_color = "#d95c50"
+    
+        draw.ellipse([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], fill="#ffffff", outline="#1a1a1a", width=6)
+        draw.chord([pb_x, pb_y, pb_x + pb_size, pb_y + pb_size], start=180, end=360, fill=top_color, outline="#1a1a1a", width=3)
+        
+        if ball_type == "great":
+            draw.chord([pb_x+25, pb_y+25, pb_x+75, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+            draw.chord([pb_x+pb_size-75, pb_y+25, pb_x+pb_size-25, pb_y+pb_size//2], 180, 360, fill="#d95c50")
+        elif ball_type == "ultra":
+            draw.chord([pb_x+30, pb_y+15, pb_x+pb_size-30, pb_y+pb_size//2+15], 180, 360, fill="#f2d12e")
+            draw.chord([pb_x+55, pb_y+40, pb_x+pb_size-55, pb_y+pb_size//2+15], 180, 360, fill="#313131")
+        elif ball_type == "master":
+            draw.ellipse([pb_x+25, pb_y+30, pb_x+75, pb_y+80], fill="#f56ab0", outline="#1a1a1a")
+            draw.ellipse([pb_x+pb_size-75, pb_y+30, pb_x+pb_size-25, pb_y+80], fill="#f56ab0", outline="#1a1a1a")
+            try:
+                m_width = draw.textlength("M", font=name_font)
+            except AttributeError:
+                m_width = 25
+            draw.text((pb_x + (pb_size - m_width)/2, pb_y+25), "M", font=name_font, fill="#ffffff")
+        elif ball_type == "gs":
+            try:
+                gs_width = draw.textlength("GS", font=name_font)
+            except AttributeError:
+                gs_width = 45
+            draw.text((pb_x + (pb_size - gs_width)/2, pb_y+25), "GS", font=name_font, fill="#1a1a1a")
+        
+        band_y = pb_y + (pb_size // 2) - 6
+        draw.rectangle([pb_x + 3, band_y, pb_x + pb_size - 3, band_y + 12], fill="#1a1a1a")
+        
+        btn_size = 56
+        btn_x = pb_x + (pb_size // 2) - (btn_size // 2)
+        btn_y = pb_y + (pb_size // 2) - (btn_size // 2)
+        draw.ellipse([btn_x, btn_y, btn_x + btn_size, btn_y + btn_size], fill="#1a1a1a")
+    
+        ibtn_size = 32
+        ibtn_x = pb_x + (pb_size // 2) - (ibtn_size // 2)
+        ibtn_y = pb_y + (pb_size // 2) - (ibtn_size // 2)
+        draw.ellipse([ibtn_x, ibtn_y, ibtn_x + ibtn_size, ibtn_y + ibtn_size], fill="#ffffff", outline="#a0a0a0", width=2)
+        
+    bio = io.BytesIO()
+    img.save(bio, format="PNG")
+    bio.seek(0)
+    return bio
+
 def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_team=None, opponent_name=None):
+    if card_type == "TRAINER":
+        return generate_profile_card_new(user_data, team)
+        
     # Dimensions
     WIDTH, HEIGHT = 480, 320
     
