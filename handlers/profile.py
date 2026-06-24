@@ -29,7 +29,7 @@ async def rank_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"📊 <b>Your Rank Stats</b>\n"
         f"Current Elo: <b>{elo}</b>\n\n"
         "🏆 <b>Elo Brackets & Rewards</b>\n"
-        "<b>< 1100:</b> Poké Ball Rank (Default)\n"
+        "<b>&lt; 1100:</b> Poké Ball Rank (Default)\n"
         "<b>1100 - 1199:</b> Great Ball Rank <i>(Unlocks Great Ball Emblem)</i>\n"
         "<b>1200 - 1299:</b> Ultra Ball Rank <i>(Unlocks Ultra Ball Emblem)</i>\n"
         "<b>1300 - 1499:</b> Master Ball Rank <i>(Unlocks Master Ball Emblem)</i>\n"
