@@ -38,11 +38,13 @@ async def fetch_random_pokemon(level: int = None, gen: str = "gen4"):
             
             # Format name for PokeAPI
             api_name = pkmn_name.lower().replace(" ", "-").replace(".", "").replace("'", "")
-            
-            resp = await client.get(f"https://pokeapi.co/api/v2/pokemon/{api_name}")
-            if resp.status_code == 200:
-                data = resp.json()
-                break
+            try:
+                resp = await client.get(f"https://pokeapi.co/api/v2/pokemon/{api_name}", timeout=10.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    break
+            except Exception:
+                continue
                 
         base_stats = {stat["stat"]["name"]: stat["base_stat"] for stat in data["stats"]}
         types = [t["type"]["name"] for t in data["types"]]
@@ -62,10 +64,13 @@ async def fetch_random_pokemon(level: int = None, gen: str = "gen4"):
         move_data = []
         for m_name in moves_to_pick:
             m_api_name = m_name.lower().replace(" ", "-")
-            m_resp = await client.get(f"https://pokeapi.co/api/v2/move/{m_api_name}")
-            if m_resp.status_code != 200:
+            try:
+                m_resp = await client.get(f"https://pokeapi.co/api/v2/move/{m_api_name}", timeout=10.0)
+                if m_resp.status_code != 200:
+                    continue
+                m_data = m_resp.json()
+            except Exception:
                 continue
-            m_data = m_resp.json()
             
             stat_map = {
                 "attack": "atk", "defense": "def", "special-attack": "sp_atk", 
@@ -122,8 +127,13 @@ async def fetch_random_pokemon(level: int = None, gen: str = "gen4"):
         
         # Download sprite
         sprite_url = data["sprites"]["front_default"]
-        sprite_resp = await client.get(sprite_url)
-        sprite_bytes = sprite_resp.content
+        sprite_bytes = None
+        try:
+            sprite_resp = await client.get(sprite_url, timeout=10.0)
+            if sprite_resp.status_code == 200:
+                sprite_bytes = sprite_resp.content
+        except Exception:
+            pass
         
         return {
             "name": pkmn_name,
