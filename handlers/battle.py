@@ -363,8 +363,8 @@ async def update_player_dm(battle_id, context, player_key):
     my_status = f" [{my_active['status'].upper()}]" if my_active.get("status") else ""
     opp_status = f" [{opp_active['status'].upper()}]" if opp_active.get("status") else ""
 
-    my_types = "-".join(t.capitalize() for t in my_active["types"])
-    opp_types = "-".join(t.capitalize() for t in opp_active["types"])
+    my_types = "-".join(t.capitalize() for t in my_active["types"]) if my_active["types"] else "Typeless"
+    opp_types = "-".join(t.capitalize() for t in opp_active["types"]) if opp_active["types"] else "Typeless"
 
     text += (
         f"{my_hp_bar} {my_active['hp']}/{my_active['max_hp']} HP\n"
@@ -425,7 +425,7 @@ async def update_spectator_dm(battle_id, context, spec_id):
         bars = max(1, int(round(hp_pct * 10))) if active['hp'] > 0 else 0
         hp_bar = "▓" * bars + "░" * (10 - bars)
         status = f" [{active['status'].upper()}]" if active.get("status") else ""
-        types = "-".join(t.capitalize() for t in active["types"])
+        types = "-".join(t.capitalize() for t in active["types"]) if active["types"] else "Typeless"
         
         text += (
             f"<b>{name}'s Team:</b>\n"
@@ -874,8 +874,12 @@ async def resolve_turn(battle_id, context, query):
                 if battle.get("terrain") == "misty" and move["type"] == "dragon" and is_grounded(def_pkmn): terrain_mod = 0.5
                 elif battle.get("terrain") == "grassy" and move["name"].lower() in ["earthquake", "magnitude", "bulldoze"] and is_grounded(def_pkmn): terrain_mod = 0.5
                 
-                dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod, weather_mod=weather_mod)
-                dmg = int(dmg * terrain_mod)
+                if move["name"].lower() in ["seismic toss", "night shade"]:
+                    dmg = atk_pkmn["level"] if type_mod > 0 else 0
+                else:
+                    dmg = calculate_damage(atk_pkmn["level"], move["power"], atk_stats, def_stats, move["class"], stab=stab, type_mod=type_mod, crit=crit_mod, weather_mod=weather_mod)
+                    dmg = int(dmg * terrain_mod)
+                
                 
                 if is_crit and move["power"] > 0:
                     action_text += "A critical hit! "
@@ -943,7 +947,7 @@ async def resolve_turn(battle_id, context, query):
                     battle[p_key]["damage_dealt"] += total_actual_dmg
                     
                     if hits_landed > 1: action_text += f"Hit {hits_landed} time(s)! "
-                    if move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
+                    if move["power"] > 0 and move["type"] in atk_pkmn["types"]: action_text += "(STAB!) "
                     if type_mod > 1.0: action_text += "(It's super effective!) "
                     elif type_mod < 1.0 and type_mod > 0: action_text += "(It's not very effective...) "
                     elif type_mod == 0: action_text += "(It had no effect...) "
@@ -987,6 +991,13 @@ async def resolve_turn(battle_id, context, query):
                         if m_name in ["explosion", "self-destruct", "misty explosion"]:
                             atk_pkmn["hp"] = 0
                             action_text += f"💥 {atk_pkmn['name']} blew itself up!\n"
+                            
+                        if m_name == "burn up" and "fire" in atk_pkmn["types"]:
+                            atk_pkmn["types"].remove("fire")
+                            action_text += f"🔥 {atk_pkmn['name']} burned itself out and lost its Fire type!\n"
+                        elif m_name == "double shock" and "electric" in atk_pkmn["types"]:
+                            atk_pkmn["types"].remove("electric")
+                            action_text += f"⚡ {atk_pkmn['name']} used up its electricity and lost its Electric type!\n"
                 
                 if move["power"] == 0:
                     m_name = move["name"].lower()
