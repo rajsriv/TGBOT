@@ -476,3 +476,79 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
     img.save(bio, format="PNG")
     bio.seek(0)
     return bio
+
+def generate_team_card(team):
+    WIDTH, HEIGHT = 480, 290
+    img = Image.new("RGBA", (WIDTH, HEIGHT), "#3b4559")
+    draw = ImageDraw.Draw(img)
+    
+    for i in range(0, HEIGHT, 4):
+        draw.line([(0, i), (WIDTH, i)], fill="#323a4b", width=1)
+        
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
+    try:
+        name_font = ImageFont.truetype(font_path, 16)
+        small_font = ImageFont.truetype(font_path, 12)
+    except:
+        name_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
+        
+    panel_w, panel_h = 220, 80
+    
+    for i in range(6):
+        if i >= len(team):
+            break
+        pkmn = team[i]
+        
+        col = i % 2
+        row = i // 2
+        
+        if col == 0:
+            px = 10
+            py = 10 + row * 90
+        else:
+            px = 245
+            py = 30 + row * 90
+            
+        draw.rectangle([px, py, px+panel_w, py+panel_h], fill="#6e9ee5", outline="#426cb4", width=2)
+        draw.rectangle([px+2, py+2, px+panel_w-2, py+10], fill="#a5c5f5")
+        
+        if i == 0:
+            draw.rectangle([px-2, py-2, px+panel_w+2, py+panel_h+2], outline="#ff7b00", width=3)
+            
+        if "sprite" in pkmn and pkmn["sprite"]:
+            try:
+                sprite_img = Image.open(io.BytesIO(pkmn["sprite"])).convert("RGBA")
+                sprite_img = sprite_img.resize((56, 56), Image.NEAREST)
+                if pkmn.get("hp", 1) <= 0:
+                    la = sprite_img.convert("LA")
+                    sprite_img = la.convert("RGBA")
+                img.paste(sprite_img, (px+10, py+12), sprite_img)
+            except Exception:
+                pass
+                
+        name = pkmn["name"].upper()
+        draw.text((px + 75, py + 8), name, font=name_font, fill="#ffffff")
+        
+        bar_x = px + 75
+        bar_y = py + 38
+        bar_w = 130
+        bar_h = 8
+        draw.rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h], fill="#313131", outline="#000000")
+        
+        hp = pkmn.get("hp", 100)
+        max_hp = pkmn.get("max_hp", 100)
+        hp_pct = max(0.0, min(1.0, hp / max_hp))
+        hp_color = "#32cd32" if hp_pct > 0.5 else "#ffd700" if hp_pct > 0.2 else "#ff4500"
+        
+        if hp > 0:
+            draw.rectangle([bar_x+1, bar_y+1, bar_x + int(bar_w * hp_pct) - 1, bar_y+bar_h-1], fill=hp_color)
+            
+        lvl = pkmn.get("level", 1)
+        draw.text((px + 15, py + panel_h - 20), f"Lv.{lvl}", font=small_font, fill="#ffffff")
+        draw.text((px + 120, py + panel_h - 20), f"{hp}/{max_hp}", font=small_font, fill="#ffffff")
+        
+    bio = io.BytesIO()
+    img.save(bio, format="PNG")
+    bio.seek(0)
+    return bio
