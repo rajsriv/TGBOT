@@ -20,7 +20,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open("utils/assets/start_bg.png", "rb") as f:
             await update.message.reply_photo(
                 photo=f,
-                caption=f"Welcome to the Pokémon world, {username}! \n\nGo in groups and cook with your friends using /showdown (tag them)!"
+                caption=f"Welcome to the Pokémon world, {username}! \n\nGo in groups and cook with your friends using /showdown (tag them) or Just hop in the DM and try /match!"
             )
     else:
         await update.message.reply_text(
