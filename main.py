@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler
 import config
 from handlers.start import start_command
 from handlers.battle import showdown_command, handle_move_callback, run_command
-from handlers.profile import profile_command
+from handlers.profile import profile_command, rank_stats_command
 from handlers.matchmaking import match_command, handle_match_callback
 from telegram.ext import CallbackQueryHandler
 
@@ -33,6 +33,7 @@ def main():
     application.add_handler(CommandHandler("run", run_command))
     application.add_handler(CommandHandler("match", match_command))
     application.add_handler(CommandHandler("profile", profile_command))
+    application.add_handler(CommandHandler("rank_stats", rank_stats_command))
     from handlers.vault import handle_vault_command, handle_equip_callback, handle_reward_command
     application.add_handler(CommandHandler("vault", handle_vault_command))
     application.add_handler(CommandHandler("reward", handle_reward_command))
