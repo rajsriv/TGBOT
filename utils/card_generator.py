@@ -176,6 +176,35 @@ def generate_trainer_card(user_data, team=None, card_type="TRAINER", opponent_te
     if card_type == "TRAINER":
         return generate_profile_card_new(user_data, team)
         
+    if card_type == "BATTLE" and team:
+        if not opponent_team:
+            return generate_team_card(team)
+        else:
+            img1 = Image.open(generate_team_card(team))
+            img2 = Image.open(generate_team_card(opponent_team))
+            
+            new_img = Image.new("RGBA", (480, 290 * 2 + 30), "#1c222e")
+            new_img.paste(img1, (0, 0))
+            new_img.paste(img2, (0, 290 + 30))
+            
+            draw = ImageDraw.Draw(new_img)
+            font_path = os.path.join(os.path.dirname(__file__), "assets", "font.ttf")
+            try:
+                vs_font = ImageFont.truetype(font_path, 24)
+            except:
+                vs_font = ImageFont.load_default()
+            
+            try:
+                vs_w = draw.textlength("VS", font=vs_font)
+            except:
+                vs_w = 30
+            draw.text(((480 - vs_w)/2, 290 + 3), "VS", font=vs_font, fill="#ffffff")
+            
+            bio = io.BytesIO()
+            new_img.save(bio, format="PNG")
+            bio.seek(0)
+            return bio
+        
     # Dimensions
     WIDTH, HEIGHT = 480, 320
     
