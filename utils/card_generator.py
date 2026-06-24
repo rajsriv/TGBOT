@@ -518,9 +518,11 @@ def generate_team_card(team):
     try:
         name_font = ImageFont.truetype(font_path, 16)
         small_font = ImageFont.truetype(font_path, 12)
+        tiny_font = ImageFont.truetype(font_path, 10)
     except:
         name_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
+        tiny_font = ImageFont.load_default()
         
     panel_w, panel_h = 220, 80
     
@@ -571,6 +573,14 @@ def generate_team_card(team):
                 name_w = draw.textlength(name, font=use_font)
             except:
                 name_w = len(name) * 7
+                
+            if name_w > 130:
+                use_font = tiny_font
+                py_offset = 14
+                try:
+                    name_w = draw.textlength(name, font=use_font)
+                except:
+                    name_w = len(name) * 6
                 
         name_x = px + 140 - name_w / 2
         if name_x < px + 70: name_x = px + 70
