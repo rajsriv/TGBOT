@@ -80,6 +80,7 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_id = msg.reply_to_message.from_user.id if msg.reply_to_message else None
 
     # Check if either player is already in a battle
+    to_delete = []
     for b_id, b_data in active_battles.items():
         in_battle = False
         user_in_battle = None
@@ -95,8 +96,14 @@ async def showdown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_in_battle = target_username
             
         if in_battle:
-            await msg.reply_text(f"⚔️ {user_in_battle} is requested to finish this battle first!", reply_to_message_id=b_data["group_msg_id"])
-            return
+            if not b_data["p1"].get("dm_chat_id") or not b_data["p2"].get("dm_chat_id"):
+                to_delete.append(b_id)
+            else:
+                await msg.reply_text(f"⚔️ {user_in_battle} is requested to finish this battle first!", reply_to_message_id=b_data.get("group_msg_id"))
+                return
+                
+    for b_id in to_delete:
+        del active_battles[b_id]
 
     loading_msg = await msg.reply_text(f"⚔️ {challenger.first_name} challenged {target_username} to a 6v6 Random Battle!\n\nGenerating teams... (this may take a few seconds)")
 
@@ -1432,3 +1439,26 @@ async def resolve_turn(battle_id, context, query):
 
     if ready and (battle["choices"]["p1"] is not None or battle["choices"]["p2"] is not None):
         context.job_queue.run_once(auto_resolve_job, 2.5, data=battle_id)
+
+async def run_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    user_id = msg.from_user.id
+    
+    for b_id, b_data in list(active_battles.items()):
+        if b_data["p1"]["id"] == user_id or b_data["p2"]["id"] == user_id:
+            if not b_data["p1"].get("dm_chat_id") or not b_data["p2"].get("dm_chat_id"):
+                del active_battles[b_id]
+                await msg.reply_text("🏃 You ran away from the pending battle.")
+                return
+            else:
+                player_key = "p1" if b_data["p1"]["id"] == user_id else "p2"
+                b_data["action_text"] = f"🏃 {b_data[player_key]['name']} ran away!\n"
+                
+                for p in b_data[player_key]["team"]:
+                    p["hp"] = 0
+                    
+                await sync_battle_state(b_id, context)
+                await msg.reply_text("🏃 You ran away from the battle. It counts as a loss!")
+                return
+                
+    await msg.reply_text("You are not currently in a battle.")

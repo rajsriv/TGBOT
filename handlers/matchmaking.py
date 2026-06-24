@@ -14,10 +14,17 @@ async def match_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     
     # Check if player is already in a battle
+    to_delete = []
     for b_id, b_data in active_battles.items():
         if b_data["p1"]["id"] == user.id or b_data["p2"]["id"] == user.id:
-            await msg.reply_text(f"⚔️ You are already in a battle! Please finish it first.")
-            return
+            if not b_data["p1"].get("dm_chat_id") or not b_data["p2"].get("dm_chat_id"):
+                to_delete.append(b_id)
+            else:
+                await msg.reply_text(f"⚔️ You are already in a battle! Please finish it first.")
+                return
+                
+    for b_id in to_delete:
+        del active_battles[b_id]
 
     keyboard = [
         [
@@ -65,7 +72,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
         bot_personalities = {
             "Aggressive": ["Rival Blue", "Rival Silver", "Paul", "Champion Lance", "Boss Giovanni", "Champion Leon"],
             "Defensive": ["Gym Leader Brock", "Gym Leader Whitney", "Gym Leader Jasmine", "Elite Four Bertha", "Gym Leader Roxanne"],
-            "Balanced": ["Pokemon Trainer Red", "Champion Cynthia", "Champion Steven", "Pokemon Trainer Ash", "Professor Oak", "Pokemon Trainer Dawn"]
+            "Balanced": ["Pokemon Trainer Red", "Champion Cynthia", "Champion Steven", "Ash Ketchum", "Professor Oak", "Dawn"]
         }
         bot_personality = random.choice(list(bot_personalities.keys()))
         bot_name = random.choice(bot_personalities[bot_personality])
@@ -88,7 +95,7 @@ async def handle_match_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "action_text": "",
             "is_ranked": match_type == "ranked",
             "p1": {"id": user.id, "name": user.first_name, "tag": user.username or user.first_name, "team": p1_team, "active": 0, "dm_chat_id": query.message.chat_id, "dm_msg_id": dm_msg.message_id, "damage_dealt": 0},
-            "p2": {"id": -1, "name": bot_name, "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
+            "p2": {"id": -1, "name": f"{bot_personality} AI", "tag": "bot", "team": p2_team, "active": 0, "dm_chat_id": None, "dm_msg_id": None, "damage_dealt": 0, "is_bot": True, "personality": bot_personality},
             "choices": {"p1": None, "p2": None},
             "menus": {"p1": "main", "p2": "main"},
             "spectators": {},
