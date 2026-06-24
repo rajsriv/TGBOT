@@ -51,7 +51,7 @@ def generate_profile_card_new(user_data, team=None):
     draw.text((stat_x, y_start_top + spacing), f"AVG DMG: {avg_dmg}", font=text_font, fill=TEXT_BLACK)
     draw.text((stat_x, y_start_top + spacing * 2), f"DEX: {dex_seen} / 493", font=text_font, fill=TEXT_BLACK)
     
-    y_start_bottom = 264
+    y_start_bottom = 244
     kd_ratio = f"{(wins / losses):.2f}" if losses > 0 else f"{wins:.2f}"
     
     draw.text((stat_x, y_start_bottom), f"K/D: {kd_ratio}", font=title_font, fill=TEXT_BLACK)
